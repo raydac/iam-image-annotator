@@ -1,0 +1,85 @@
+package com.igormaznitsa.annotator.api.model;
+
+import java.awt.Color;
+import java.util.Objects;
+
+public final class AnnotationEntry {
+
+  private final String id;
+  private final AnnotationType type;
+  private final String fillColorHex;
+  private final AnnotationCoords coords;
+  private final boolean locked;
+
+  public AnnotationEntry(
+      final String id,
+      final AnnotationType type,
+      final String fillColorHex,
+      final AnnotationCoords coords) {
+    this(id, type, fillColorHex, coords, false);
+  }
+
+  public AnnotationEntry(
+      final String id,
+      final AnnotationType type,
+      final String fillColorHex,
+      final AnnotationCoords coords,
+      final boolean locked) {
+    this.id = ClassNames.normalize(id);
+    this.type = Objects.requireNonNull(type, "type");
+    this.fillColorHex = ClassNames.normalizeColor(fillColorHex);
+    this.coords = Objects.requireNonNull(coords, "coords");
+    this.locked = locked;
+  }
+
+  public String id() {
+    return this.id;
+  }
+
+  public AnnotationType type() {
+    return this.type;
+  }
+
+  public String fillColorHex() {
+    return this.fillColorHex;
+  }
+
+  public AnnotationCoords coords() {
+    return this.coords;
+  }
+
+  public boolean locked() {
+    return this.locked;
+  }
+
+  public Color fillColor() {
+    return Color.decode(this.fillColorHex);
+  }
+
+  /**
+   * Border color derived from {@link #fillColor()} for contrast.
+   */
+  public Color strokeColor() {
+    return AnnotationColors.contrastStrokeColor(this.fillColorHex);
+  }
+
+  public AnnotationEntry withId(final String newId) {
+    return new AnnotationEntry(newId, this.type, this.fillColorHex, this.coords, this.locked);
+  }
+
+  public AnnotationEntry withCoords(final AnnotationCoords newCoords) {
+    return new AnnotationEntry(this.id, this.type, this.fillColorHex, newCoords, this.locked);
+  }
+
+  public AnnotationEntry withFillColor(final String newFillColorHex) {
+    return new AnnotationEntry(this.id, this.type, newFillColorHex, this.coords, this.locked);
+  }
+
+  public AnnotationEntry withType(final AnnotationType newType) {
+    return new AnnotationEntry(this.id, newType, this.fillColorHex, this.coords, this.locked);
+  }
+
+  public AnnotationEntry withLocked(final boolean newLocked) {
+    return new AnnotationEntry(this.id, this.type, this.fillColorHex, this.coords, newLocked);
+  }
+}
