@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Stream;
 import javax.swing.JScrollPane;
 import javax.swing.JTree;
@@ -123,12 +124,16 @@ public final class FileTreePanel extends JScrollPane {
     return null;
   }
 
+  private static String normalizedFileName(final Path path) {
+    return path.getFileName().toString().toLowerCase(Locale.ROOT);
+  }
+
   private DefaultMutableTreeNode buildNode(final Path path) throws IOException {
     final FileTreeNode user = new FileTreeNode(path);
     final DefaultMutableTreeNode node = new DefaultMutableTreeNode(user);
     if (Files.isDirectory(path)) {
       try (Stream<Path> children = Files.list(path)) {
-        children.sorted(Comparator.comparing(p -> p.getFileName().toString().toLowerCase()))
+        children.sorted(Comparator.comparing(FileTreePanel::normalizedFileName))
             .filter(child -> Files.isDirectory(child) || AllowedImageFiles.isAllowed(child))
             .forEach(child -> {
               try {

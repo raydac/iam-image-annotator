@@ -4,6 +4,7 @@ import com.igormaznitsa.annotator.api.model.AnnotationEntry;
 import com.igormaznitsa.annotator.ui.api.EditorPanelContext;
 import com.igormaznitsa.annotator.ui.api.ImageViewToggle;
 
+import java.util.Locale;
 import java.util.Optional;
 
 public final class LockSelectedToggle implements ImageViewToggle {
@@ -35,8 +36,8 @@ public final class LockSelectedToggle implements ImageViewToggle {
   public String tooltip(final EditorPanelContext context) {
     return this.selectedEntry(context)
         .map(entry -> entry.locked()
-            ? "Unlock \"%s\" (allow point edits and rename)".formatted(entry.id())
-            : "Lock \"%s\" (block point edits and rename)".formatted(entry.id()))
+            ? String.format(Locale.ROOT, "Unlock \"%s\" (allow point edits and rename)", entry.id())
+            : String.format(Locale.ROOT, "Lock \"%s\" (block point edits and rename)", entry.id()))
         .orElse("Select a shape to lock or unlock");
   }
 

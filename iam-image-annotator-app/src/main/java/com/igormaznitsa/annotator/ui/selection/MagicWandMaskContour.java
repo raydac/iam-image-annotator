@@ -3,11 +3,14 @@ package com.igormaznitsa.annotator.ui.selection;
 import com.igormaznitsa.annotator.api.model.NormPoint;
 
 import java.awt.Point;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Traces the outer boundary of a flood-fill mask and builds a simplified polygon.
@@ -17,12 +20,32 @@ final class MagicWandMaskContour {
   private static final int MIN_POLYGON_VERTICES = 3;
   private static final int MAX_CONTOUR_POINTS = 4_096;
 
-  private static final int[] NEIGHBOR_4_DX = {1, -1, 0, 0};
-  private static final int[] NEIGHBOR_4_DY = {0, 0, 1, -1};
-  private static final int[] DIR_DX = {1, 1, 0, -1, -1, -1, 0, 1};
-  private static final int[] DIR_DY = {0, 1, 1, 1, 0, -1, -1, -1};
+  private static final int DIRECTION_EAST = 0;
+  private static final int DIRECTION_SOUTH = 1;
+  private static final int DIRECTION_WEST = 2;
+  private static final int DIRECTION_NORTH = 3;
 
   private MagicWandMaskContour() {
+  }
+
+  private static List<Point> traceOuterContour(
+      final BitSet region,
+      final int width,
+      final int height,
+      final int seedX,
+      final int seedY) {
+    if (!region.get(MagicWandMask.index(width, seedX, seedY))) {
+      return List.of();
+    }
+    final List<Point> contour = selectSeedContour(
+        traceBoundaryLoops(region, width, height),
+        (seedX + 0.5) / width,
+        (seedY + 0.5) / height,
+        width,
+        height);
+    return contour.size() > MAX_CONTOUR_POINTS
+        ? subsampleContour(contour, MAX_CONTOUR_POINTS)
+        : contour;
   }
 
   static Optional<List<NormPoint>> toPolygon(
@@ -48,104 +71,175 @@ final class MagicWandMaskContour {
     return Optional.of(seedSafe);
   }
 
-  private static List<Point> traceOuterContour(
+  private static List<List<Point>> traceBoundaryLoops(
+      final BitSet region,
+      final int width,
+      final int height) {
+    final List<BorderEdge> edges = buildBoundaryEdges(region, width, height);
+    final Map<Point, List<BorderEdge>> edgesByStart = groupEdgesByStart(edges);
+    final Set<BorderEdge> unused = new HashSet<>(edges);
+    final List<List<Point>> loops = new ArrayList<>();
+    for (final BorderEdge edge : edges) {
+      if (!unused.contains(edge)) {
+        continue;
+      }
+      final List<Point> loop = traceBoundaryLoop(edge, edgesByStart, unused, edges.size());
+      if (loop.size() >= MIN_POLYGON_VERTICES) {
+        loops.add(loop);
+      }
+    }
+    return loops;
+  }
+
+  private static List<BorderEdge> buildBoundaryEdges(
+      final BitSet region,
+      final int width,
+      final int height) {
+    final List<BorderEdge> edges = new ArrayList<>();
+    for (int y = 0; y < height; y++) {
+      for (int x = 0; x < width; x++) {
+        if (!region.get(MagicWandMask.index(width, x, y))) {
+          continue;
+        }
+        addBoundaryEdges(region, width, height, edges, x, y);
+      }
+    }
+    return edges;
+  }
+
+  private static void addBoundaryEdges(
       final BitSet region,
       final int width,
       final int height,
-      final int seedX,
-      final int seedY) {
-    final int start = findBoundaryStartNearSeed(region, width, height, seedX, seedY);
-    if (start < 0) {
-      return List.of();
+      final List<BorderEdge> edges,
+      final int x,
+      final int y) {
+    if (!hasRegionPixel(region, width, height, x, y - 1)) {
+      edges.add(new BorderEdge(new Point(x, y), new Point(x + 1, y), DIRECTION_EAST));
     }
-    int x = start % width;
-    int y = start / width;
-    int direction = 7;
-    final int startX = x;
-    final int startY = y;
-    final List<Point> contour = new ArrayList<>();
-    int guard = 0;
-    do {
-      contour.add(new Point(x, y));
-      if (contour.size() > MAX_CONTOUR_POINTS) {
-        return subsampleContour(contour, MAX_CONTOUR_POINTS);
-      }
-      boolean stepped = false;
-      final int from = (direction + 5) & 7;
-      for (int offset = 0; offset < 8; offset++) {
-        final int nextDirection = (from + offset) & 7;
-        final int nextX = x + DIR_DX[nextDirection];
-        final int nextY = y + DIR_DY[nextDirection];
-        if (isBoundaryPixel(region, width, height, nextX, nextY)) {
-          x = nextX;
-          y = nextY;
-          direction = nextDirection;
-          stepped = true;
-          break;
-        }
-      }
-      if (!stepped) {
-        break;
-      }
-      guard++;
-    } while ((x != startX || y != startY || contour.size() == 1) && guard < width * height * 4);
-    if (contour.size() > 1 && contour.get(0).equals(contour.get(contour.size() - 1))) {
-      contour.remove(contour.size() - 1);
+    if (!hasRegionPixel(region, width, height, x + 1, y)) {
+      edges.add(new BorderEdge(new Point(x + 1, y), new Point(x + 1, y + 1), DIRECTION_SOUTH));
     }
-    return contour;
+    if (!hasRegionPixel(region, width, height, x, y + 1)) {
+      edges.add(new BorderEdge(new Point(x + 1, y + 1), new Point(x, y + 1), DIRECTION_WEST));
+    }
+    if (!hasRegionPixel(region, width, height, x - 1, y)) {
+      edges.add(new BorderEdge(new Point(x, y + 1), new Point(x, y), DIRECTION_NORTH));
+    }
   }
 
-  private static int findBoundaryStartNearSeed(
-      final BitSet region,
+  private static boolean hasRegionPixel(final BitSet region, final int width, final int height,
+                                        final int x, final int y) {
+    return MagicWandMask.isInside(width, height, x, y)
+        && region.get(MagicWandMask.index(width, x, y));
+  }
+
+  private static Map<Point, List<BorderEdge>> groupEdgesByStart(final List<BorderEdge> edges) {
+    final Map<Point, List<BorderEdge>> edgesByStart = new HashMap<>();
+    for (final BorderEdge edge : edges) {
+      edgesByStart.computeIfAbsent(edge.from(), ignored -> new ArrayList<>()).add(edge);
+    }
+    return edgesByStart;
+  }
+
+  private static List<Point> traceBoundaryLoop(
+      final BorderEdge first,
+      final Map<Point, List<BorderEdge>> edgesByStart,
+      final Set<BorderEdge> unused,
+      final int maxSteps) {
+    BorderEdge edge = first;
+    final List<Point> loop = new ArrayList<>();
+    for (int steps = 0; steps < maxSteps && unused.remove(edge); steps++) {
+      loop.add(edge.from());
+      if (edge.to().equals(first.from())) {
+        return loop;
+      }
+      final Optional<BorderEdge> next = chooseNextEdge(edge, edgesByStart, unused);
+      if (next.isEmpty()) {
+        return List.of();
+      }
+      edge = next.get();
+    }
+    return List.of();
+  }
+
+  private static Optional<BorderEdge> chooseNextEdge(
+      final BorderEdge current,
+      final Map<Point, List<BorderEdge>> edgesByStart,
+      final Set<BorderEdge> unused) {
+    BorderEdge best = null;
+    int bestTurn = Integer.MAX_VALUE;
+    for (final BorderEdge candidate : edgesByStart.getOrDefault(current.to(), List.of())) {
+      if (!unused.contains(candidate)) {
+        continue;
+      }
+      final int turn = Math.floorMod(candidate.direction() - current.direction(), 4);
+      if (turn < bestTurn) {
+        best = candidate;
+        bestTurn = turn;
+      }
+    }
+    return Optional.ofNullable(best);
+  }
+
+  private static List<Point> selectSeedContour(
+      final List<List<Point>> contours,
+      final double seedNormX,
+      final double seedNormY,
       final int width,
-      final int height,
-      final int seedX,
-      final int seedY) {
-    if (!region.get(MagicWandMask.index(width, seedX, seedY))) {
-      return -1;
-    }
-    final ArrayDeque<Integer> queue = new ArrayDeque<>();
-    final BitSet visited = new BitSet(width * height);
-    queue.add(MagicWandMask.index(width, seedX, seedY));
-    visited.set(MagicWandMask.index(width, seedX, seedY));
-    while (!queue.isEmpty()) {
-      final int current = queue.poll();
-      final int x = current % width;
-      final int y = current / width;
-      if (isBoundaryPixel(region, width, height, x, y)) {
-        return current;
+      final int height) {
+    List<Point> best = List.of();
+    double bestArea = 0.0;
+    for (final List<Point> contour : contours) {
+      final double area = signedPointArea(contour);
+      if (area <= 0.0 || area <= bestArea ||
+          !containsPoint(seedNormX, seedNormY, toNormalizedContour(contour, width, height))) {
+        continue;
       }
-      for (int direction = 0; direction < NEIGHBOR_4_DX.length; direction++) {
-        final int neighborX = x + NEIGHBOR_4_DX[direction];
-        final int neighborY = y + NEIGHBOR_4_DY[direction];
-        if (!MagicWandMask.isInside(width, height, neighborX, neighborY)) {
-          continue;
-        }
-        final int neighbor = MagicWandMask.index(width, neighborX, neighborY);
-        if (!region.get(neighbor) || visited.get(neighbor)) {
-          continue;
-        }
-        visited.set(neighbor);
-        queue.add(neighbor);
-      }
+      best = contour;
+      bestArea = area;
     }
-    return -1;
+    return best.isEmpty() ? largestClockwiseContour(contours) : best;
   }
 
-  private static boolean isBoundaryPixel(final BitSet region, final int width, final int height,
-                                         final int x, final int y) {
-    if (!MagicWandMask.isInside(width, height, x, y) ||
-        !region.get(MagicWandMask.index(width, x, y))) {
-      return false;
+  private static List<Point> largestClockwiseContour(final List<List<Point>> contours) {
+    List<Point> best = List.of();
+    double bestArea = 0.0;
+    for (final List<Point> contour : contours) {
+      final double area = signedPointArea(contour);
+      if (area > bestArea) {
+        best = contour;
+        bestArea = area;
+      }
     }
-    return x == 0
-        || y == 0
-        || x == width - 1
-        || y == height - 1
-        || !region.get(MagicWandMask.index(width, x - 1, y))
-        || !region.get(MagicWandMask.index(width, x + 1, y))
-        || !region.get(MagicWandMask.index(width, x, y - 1))
-        || !region.get(MagicWandMask.index(width, x, y + 1));
+    return best;
+  }
+
+  private static double signedPointArea(final List<Point> points) {
+    double area = 0.0;
+    for (int i = 0; i < points.size(); i++) {
+      final Point current = points.get(i);
+      final Point next = points.get((i + 1) % points.size());
+      area += (double) current.x * next.y - (double) next.x * current.y;
+    }
+    return area * 0.5;
+  }
+
+  private static List<NormPoint> ensureContainsSeed(
+      final List<NormPoint> polygon,
+      final List<NormPoint> fullContour,
+      final NormPoint seed,
+      final double epsilon) {
+    if (containsPoint(seed.x(), seed.y(), polygon)) {
+      return polygon;
+    }
+    for (final double factor : new double[] {0.5, 0.2, 0.05, 0.0}) {
+      final List<NormPoint> relaxed = simplifyClosedPolygon(fullContour, epsilon * factor);
+      if (containsPoint(seed.x(), seed.y(), relaxed)) {
+        return relaxed;
+      }
+    }
+    return List.copyOf(fullContour);
   }
 
   private static List<Point> subsampleContour(final List<Point> contour, final int maxPoints) {
@@ -169,48 +263,7 @@ final class MagicWandMaskContour {
     return points;
   }
 
-  private static List<NormPoint> ensureContainsSeed(
-      final List<NormPoint> polygon,
-      final List<NormPoint> fullContour,
-      final NormPoint seed,
-      final double epsilon) {
-    if (containsPoint(seed.x(), seed.y(), polygon)) {
-      return polygon;
-    }
-    for (final double factor : new double[] {0.5, 0.2, 0.05, 0.0}) {
-      final List<NormPoint> relaxed = simplifyClosedPolygon(fullContour, epsilon * factor);
-      if (containsPoint(seed.x(), seed.y(), relaxed)) {
-        return relaxed;
-      }
-    }
-    return insertVertexNearSeed(polygon, seed);
-  }
-
-  private static List<NormPoint> insertVertexNearSeed(final List<NormPoint> polygon,
-                                                      final NormPoint seed) {
-    if (polygon.isEmpty()) {
-      return List.of(seed);
-    }
-    int bestEdge = 0;
-    double bestDistance = Double.POSITIVE_INFINITY;
-    for (int i = 0; i < polygon.size(); i++) {
-      final NormPoint start = polygon.get(i);
-      final NormPoint end = polygon.get((i + 1) % polygon.size());
-      final double distance = perpendicularDistance(seed, start, end);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestEdge = i;
-      }
-    }
-    final List<NormPoint> expanded = new ArrayList<>(polygon.size() + 1);
-    for (int i = 0; i <= bestEdge; i++) {
-      expanded.add(polygon.get(i));
-    }
-    expanded.add(seed);
-    for (int i = bestEdge + 1; i < polygon.size(); i++) {
-      expanded.add(polygon.get(i));
-    }
-    return expanded;
+  private record BorderEdge(Point from, Point to, int direction) {
   }
 
   private static boolean containsPoint(final double x, final double y,

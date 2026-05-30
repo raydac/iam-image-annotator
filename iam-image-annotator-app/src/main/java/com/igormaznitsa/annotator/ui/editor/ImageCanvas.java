@@ -21,6 +21,7 @@ import java.awt.event.MouseEvent;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -653,7 +654,9 @@ public final class ImageCanvas extends JPanel implements EditorPanelContext {
     final int height = Math.max(1, this.image().getHeight());
     final double nx = this.lastImagePoint.x / (double) width;
     final double ny = this.lastImagePoint.y / (double) height;
-    final String text = "x=%d y=%d  norm=(%.3f, %.3f)  zoom=%.0f%%  annotations=%d".formatted(
+    final String text = String.format(
+        Locale.ROOT,
+        "x=%d y=%d  norm=(%.3f, %.3f)  zoom=%.0f%%  annotations=%d",
         this.lastImagePoint.x,
         this.lastImagePoint.y,
         nx,

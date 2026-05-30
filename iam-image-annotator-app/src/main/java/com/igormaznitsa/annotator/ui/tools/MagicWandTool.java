@@ -18,6 +18,7 @@ import java.awt.Point;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -143,8 +144,10 @@ public final class MagicWandTool extends AbstractMouseEditTool {
     final String previewHint = newSettings.livePreview()
         ? "live preview on"
         : "live preview off";
-    context.updateStatus(this.statusLine(
-        "%s — Shift+click settings, scroll wheel tolerance".formatted(previewHint)));
+    context.updateStatus(this.statusLine(String.format(
+        Locale.ROOT,
+        "%s — Shift+click settings, scroll wheel tolerance",
+        previewHint)));
   }
 
   private void previewAt(final EditorPanelContext context, final Point imagePoint) {
@@ -207,8 +210,10 @@ public final class MagicWandTool extends AbstractMouseEditTool {
   }
 
   private String statusLine(final String hint) {
-    return "Magic wand [%s, tol %.2f, smooth %.2f]: %s".formatted(
-        this.settings.mode().name().toLowerCase(),
+    return String.format(
+        Locale.ROOT,
+        "Magic wand [%s, tol %.2f, smooth %.2f]: %s",
+        this.settings.mode().name().toLowerCase(Locale.ROOT),
         this.settings.tolerance(),
         this.settings.smoothness(),
         hint);

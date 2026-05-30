@@ -14,6 +14,7 @@ import java.awt.Point;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 public final class PolygonTool extends AbstractMouseEditTool {
@@ -49,7 +50,9 @@ public final class PolygonTool extends AbstractMouseEditTool {
       return false;
     }
     if (this.points.size() < MIN_VERTICES) {
-      context.updateStatus("Polygon needs at least %d points (%d placed)".formatted(
+      context.updateStatus(String.format(
+          Locale.ROOT,
+          "Polygon needs at least %d points (%d placed)",
           MIN_VERTICES,
           this.points.size()));
       return true;
@@ -103,11 +106,17 @@ public final class PolygonTool extends AbstractMouseEditTool {
 
   private void updatePlacementStatus(final EditorPanelContext context) {
     if (this.points.size() >= MIN_VERTICES) {
-      context.updateStatus(
-          "Polygon points: %d — Enter or right-click to finish".formatted(this.points.size()));
+      context.updateStatus(String.format(
+          Locale.ROOT,
+          "Polygon points: %d — Enter or right-click to finish",
+          this.points.size()));
       return;
     }
-    context.updateStatus("Polygon points: %d/%d".formatted(this.points.size(), MIN_VERTICES));
+    context.updateStatus(String.format(
+        Locale.ROOT,
+        "Polygon points: %d/%d",
+        this.points.size(),
+        MIN_VERTICES));
   }
 
   private void publishDraft(final EditorPanelContext context, final Optional<NormPoint> cursor) {

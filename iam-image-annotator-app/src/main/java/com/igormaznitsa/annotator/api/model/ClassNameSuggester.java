@@ -1,6 +1,7 @@
 package com.igormaznitsa.annotator.api.model;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -51,7 +52,7 @@ public final class ClassNameSuggester {
         max = Math.max(max, Integer.parseInt(matcher.group(1)));
       }
     }
-    final String candidate = "%s-%d".formatted(DEFAULT_PREFIX, max + 1);
+    final String candidate = String.format(Locale.ROOT, "%s-%d", DEFAULT_PREFIX, max + 1);
     return document.findById(candidate).isPresent() ? uniquify(document, candidate) : candidate;
   }
 }

@@ -1,0 +1,30 @@
+## 1. Implementation Progress
+- 2026-05-30: Reviewed clean working tree and Maven app module; fixed remaining no-arg locale-sensitive case conversion/formatting in UI and model helper code.
+- 2026-05-30: Reworked magic-wand contour tracing to emit ordered border-edge polygons and added regression coverage for simple, non-crossing wand output.
+- 2026-05-30: Added a translucent glass-pane spinner while opening PNG sessions so slow image decoding no longer looks like an application freeze.
+- 2026-05-30: Hardened magic-wand contour fallback so the click point is never injected as a boundary vertex.
+
+## 2. Architecture & Technical Discoveries
+- Java 21 Maven project; use `mvn22` for builds and tests.
+- Main app module is `iam-image-annotator-app`; Windows launcher is only included by the `publish` Maven profile.
+- PNG annotation persistence is handled through custom PNG chunks and JSON serialization.
+- Magic wand flood-fill masks are converted to polygon annotations in `MagicWandMaskContour`; border-edge tracing is used to avoid cycles from irregular boundary-pixel ordering.
+- `MainFrame` opens new image sessions through a `SwingWorker` plus a glass-pane busy overlay; existing-open tabs are selected immediately.
+
+## 3. Technical Debt & Refactoring
+- Some Swing UI methods return `null` internally for optional UI state; consider tightening to `Optional` where it improves call-site clarity.
+
+## 4. Current Work In Progress
+- Slow PNG open glass-pane progress and magic-wand seed fallback fixes completed; `mvn22 test` passes.
+
+## 5. Known Issues & Limitations
+- No changelog file is present in the project root.
+
+## 6. Open Questions & Pending Decisions
+- None currently.
+
+## 7. Useful References
+- Run tests: `mvn22 test`
+
+## 8. User Advice and Recommendations
+- Keep project notes concise and update them during substantial development work.

@@ -28,10 +28,18 @@ import com.igormaznitsa.annotator.ui.tools.ZoomInAction;
 import com.igormaznitsa.annotator.ui.tools.ZoomOutAction;
 import com.igormaznitsa.annotator.ui.tree.FileTreePanel;
 import com.igormaznitsa.annotator.ui.tree.TreeOperationBar;
+import java.awt.AlphaComposite;
+import java.awt.BasicStroke;
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.event.InputEvent;
+import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
@@ -39,6 +47,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import javax.imageio.ImageIO;
 import javax.swing.AbstractAction;
@@ -53,6 +63,8 @@ import javax.swing.JPanel;
 import javax.swing.JRootPane;
 import javax.swing.JSplitPane;
 import javax.swing.KeyStroke;
+import javax.swing.SwingWorker;
+import javax.swing.Timer;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
 public final class MainFrame extends JFrame implements TreeOperationContext {
@@ -78,7 +90,9 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
   private final List<com.igormaznitsa.annotator.ui.api.ImageViewToggle> viewToggles =
       List.of(new GridToggle());
   private final EditorTabbedPane editorTabs;
+  private final BusyGlassPane busyGlassPane = new BusyGlassPane();
   private final JLabel statusLabel = new JLabel("Ready");
+  private int progressTaskCount;
 
   private final JMenuItem saveItem = new JMenuItem("Save");
   private final JMenuItem saveAsItem = new JMenuItem("Save as...");
@@ -110,6 +124,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     this.setMinimumSize(new Dimension(1100, 700));
     this.setJMenuBar(this.buildMenuBar());
     this.setContentPane(this.buildContent());
+    this.setGlassPane(this.busyGlassPane);
     this.wireEvents();
     this.treeOperations.bind(this);
     this.updateMenuItems();
@@ -160,11 +175,11 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
   @Override
   public void runWithProgress(final String title, final Runnable task,
                               final Consumer<Exception> onError) {
-    try {
+    this.runWithProgress(() -> {
       task.run();
-    } catch (final Exception exception) {
-      onError.accept(exception);
-    }
+      return null;
+    }, ignored -> {
+    }, onError);
   }
 
   private JMenuBar buildMenuBar() {
@@ -365,23 +380,37 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
 
   private void openPath(final Path path) {
     try {
-      final EditorSession session;
       if (this.editorTabs.hasOpenTab(path)) {
-        session = this.workspace.allSessions().stream()
-            .filter(open -> open.filePath().equals(path))
-            .findFirst()
-            .orElseThrow(
-                () -> new IllegalStateException("Open tab without workspace session: " + path));
-      } else {
-        this.workspace.close(path);
-        session = this.loadSession(path);
+        this.showSession(this.openSessionForExistingTab(path));
+        return;
       }
-      this.workspace.open(session);
-      this.editorTabs.openSession(session, this.statusLabel::setText);
-      this.editorTabs.selectSession(session.filePath());
+
+      this.openNewSessionWithProgress(path);
     } catch (final Exception exception) {
       this.showError("Open failed: " + exception.getMessage());
     }
+  }
+
+  private EditorSession openSessionForExistingTab(final Path path) {
+    return this.workspace.allSessions().stream()
+        .filter(open -> open.filePath().equals(path))
+        .findFirst()
+        .orElseThrow(
+            () -> new IllegalStateException("Open tab without workspace session: " + path));
+  }
+
+  private void openNewSessionWithProgress(final Path path) {
+    this.workspace.close(path);
+    this.runWithProgress(
+        () -> this.loadSession(path),
+        this::showSession,
+        exception -> this.showError("Open failed: " + exception.getMessage()));
+  }
+
+  private void showSession(final EditorSession session) {
+    this.workspace.open(session);
+    this.editorTabs.openSession(session, this.statusLabel::setText);
+    this.editorTabs.selectSession(session.filePath());
   }
 
   private EditorSession loadSession(final Path path) throws IOException {
@@ -399,6 +428,57 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
         return EditorSession.fromImage(path, image);
       }
       throw exception;
+    }
+  }
+
+  private <T> void runWithProgress(final Callable<T> task,
+                                   final Consumer<T> onSuccess,
+                                   final Consumer<Exception> onError) {
+    this.showBusyOverlay();
+    final SwingWorker<T, Void> worker = new SwingWorker<>() {
+      @Override
+      protected T doInBackground() throws Exception {
+        return task.call();
+      }
+
+      @Override
+      protected void done() {
+        MainFrame.this.completeProgressTask(this, onSuccess, onError);
+      }
+    };
+    worker.execute();
+  }
+
+  private <T> void completeProgressTask(final SwingWorker<T, Void> worker,
+                                        final Consumer<T> onSuccess,
+                                        final Consumer<Exception> onError) {
+    try {
+      final T result = worker.get();
+      this.hideBusyOverlay();
+      onSuccess.accept(result);
+    } catch (final InterruptedException exception) {
+      Thread.currentThread().interrupt();
+      this.hideBusyOverlay();
+      onError.accept(exception);
+    } catch (final ExecutionException exception) {
+      this.hideBusyOverlay();
+      onError.accept(this.toException(exception.getCause()));
+    }
+  }
+
+  private Exception toException(final Throwable cause) {
+    return cause instanceof Exception exception ? exception : new Exception(cause);
+  }
+
+  private void showBusyOverlay() {
+    this.progressTaskCount++;
+    this.busyGlassPane.start();
+  }
+
+  private void hideBusyOverlay() {
+    this.progressTaskCount = Math.max(0, this.progressTaskCount - 1);
+    if (this.progressTaskCount == 0) {
+      this.busyGlassPane.stop();
     }
   }
 
@@ -511,5 +591,84 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     this.undoItem.setEnabled(hasActiveEditor && canvas.session().canUndo());
     this.redoItem.setEnabled(hasActiveEditor && canvas.session().canRedo());
     this.showJsonItem.setEnabled(hasActiveEditor);
+  }
+
+  private static final class BusyGlassPane extends JPanel {
+
+    private static final int FRAME_DELAY_MS = 40;
+    private static final int OVERLAY_ALPHA = 128;
+    private static final int SPINNER_SIZE = 64;
+    private static final int SPINNER_STROKE = 7;
+    private static final int ARC_COUNT = 12;
+    private static final Color OVERLAY_COLOR = new Color(0, 0, 0, OVERLAY_ALPHA);
+    private static final Color SPINNER_COLOR = new Color(36, 196, 112);
+    private int frame;
+    private final Timer timer = new Timer(FRAME_DELAY_MS, event -> this.rotate());
+
+    private BusyGlassPane() {
+      this.setOpaque(false);
+      this.setVisible(false);
+      this.setFocusable(true);
+      this.addMouseListener(new MouseAdapter() {
+      });
+      this.addMouseMotionListener(new MouseAdapter() {
+      });
+      this.addMouseWheelListener(event -> {
+      });
+      this.addKeyListener(new KeyAdapter() {
+      });
+    }
+
+    private void start() {
+      this.frame = 0;
+      this.setVisible(true);
+      this.requestFocusInWindow();
+      this.timer.start();
+      this.repaint();
+    }
+
+    private void stop() {
+      this.timer.stop();
+      this.setVisible(false);
+    }
+
+    private void rotate() {
+      this.frame = (this.frame + 1) % ARC_COUNT;
+      this.repaint();
+    }
+
+    @Override
+    protected void paintComponent(final Graphics graphics) {
+      super.paintComponent(graphics);
+      final Graphics2D canvas = (Graphics2D) graphics.create();
+      try {
+        this.paintOverlay(canvas);
+        this.paintSpinner(canvas);
+      } finally {
+        canvas.dispose();
+      }
+    }
+
+    private void paintOverlay(final Graphics2D canvas) {
+      canvas.setColor(OVERLAY_COLOR);
+      canvas.fillRect(0, 0, this.getWidth(), this.getHeight());
+    }
+
+    private void paintSpinner(final Graphics2D canvas) {
+      canvas.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+      canvas.setStroke(new BasicStroke(SPINNER_STROKE, BasicStroke.CAP_ROUND,
+          BasicStroke.JOIN_ROUND));
+
+      final int left = (this.getWidth() - SPINNER_SIZE) / 2;
+      final int top = (this.getHeight() - SPINNER_SIZE) / 2;
+      for (int i = 0; i < ARC_COUNT; i++) {
+        final float alpha = (i + 1.0f) / ARC_COUNT;
+        canvas.setComposite(AlphaComposite.SrcOver.derive(alpha));
+        canvas.setColor(SPINNER_COLOR);
+        canvas.drawArc(left, top, SPINNER_SIZE, SPINNER_SIZE,
+            90 - ((this.frame + i) % ARC_COUNT) * 360 / ARC_COUNT,
+            18);
+      }
+    }
   }
 }

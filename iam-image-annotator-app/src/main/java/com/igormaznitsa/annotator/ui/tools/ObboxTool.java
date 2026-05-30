@@ -14,6 +14,7 @@ import java.awt.Point;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import javax.swing.JOptionPane;
 
@@ -61,7 +62,10 @@ public final class ObboxTool extends AbstractMouseEditTool {
     }
     if (this.freeQuadMode) {
       if (this.corners.size() < 4) {
-        context.updateStatus("OBB free quad needs 4 corners (%d/4)".formatted(this.corners.size()));
+        context.updateStatus(String.format(
+            Locale.ROOT,
+            "OBB free quad needs 4 corners (%d/4)",
+            this.corners.size()));
         return true;
       }
       try {
@@ -73,8 +77,10 @@ public final class ObboxTool extends AbstractMouseEditTool {
       return true;
     }
     if (this.corners.size() < 3) {
-      context.updateStatus(
-          "OBB rotated mode needs 3 corners (%d/3)".formatted(this.corners.size()));
+      context.updateStatus(String.format(
+          Locale.ROOT,
+          "OBB rotated mode needs 3 corners (%d/3)",
+          this.corners.size()));
       return true;
     }
     try {
@@ -150,7 +156,10 @@ public final class ObboxTool extends AbstractMouseEditTool {
     if (this.corners.size() >= 4) {
       context.updateStatus("OBB free quad: 4/4 — Enter or right-click to finish");
     } else {
-      context.updateStatus("OBB free quad: corner %d/4 (Shift)".formatted(this.corners.size()));
+      context.updateStatus(String.format(
+          Locale.ROOT,
+          "OBB free quad: corner %d/4 (Shift)",
+          this.corners.size()));
     }
     if (this.corners.size() == 4) {
       try {

@@ -4,6 +4,7 @@ import com.igormaznitsa.annotator.api.model.AnnotationEntry;
 import com.igormaznitsa.annotator.ui.api.EditorPanelContext;
 import java.awt.Component;
 import java.awt.Window;
+import java.util.Locale;
 import java.util.Optional;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
@@ -256,7 +257,7 @@ public final class VertexEditOperations {
     final Window owner = component == null ? null : SwingUtilities.getWindowAncestor(component);
     return JOptionPane.showConfirmDialog(
         owner,
-        "Remove annotation \"%s\"?".formatted(entry.id()),
+        String.format(Locale.ROOT, "Remove annotation \"%s\"?", entry.id()),
         "Remove shape",
         JOptionPane.YES_NO_OPTION,
         JOptionPane.QUESTION_MESSAGE) == JOptionPane.YES_OPTION;
@@ -268,7 +269,7 @@ public final class VertexEditOperations {
     final Window owner = component == null ? null : SwingUtilities.getWindowAncestor(component);
     return JOptionPane.showConfirmDialog(
         owner,
-        "Remove the selected point from annotation \"%s\"?".formatted(entry.id()),
+        String.format(Locale.ROOT, "Remove the selected point from annotation \"%s\"?", entry.id()),
         "Remove point",
         JOptionPane.YES_NO_OPTION,
         JOptionPane.QUESTION_MESSAGE) == JOptionPane.YES_OPTION;

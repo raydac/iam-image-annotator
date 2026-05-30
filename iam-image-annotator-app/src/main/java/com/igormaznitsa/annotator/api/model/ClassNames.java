@@ -40,7 +40,9 @@ public final class ClassNames {
     final int r = (hash & 0xFF0000) >> 16;
     final int g = (hash & 0x00FF00) >> 8;
     final int b = hash & 0x0000FF;
-    return normalizeColor("#%02X%02X%02X".formatted(
+    return normalizeColor(String.format(
+        Locale.ROOT,
+        "#%02X%02X%02X",
         Math.max(64, r),
         Math.max(64, g),
         Math.max(64, b)));

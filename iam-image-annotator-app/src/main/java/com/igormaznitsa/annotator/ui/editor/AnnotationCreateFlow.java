@@ -5,6 +5,7 @@ import com.igormaznitsa.annotator.api.model.AnnotationEntry;
 import com.igormaznitsa.annotator.api.model.AnnotationType;
 import com.igormaznitsa.annotator.api.model.ClassNameSuggester;
 import com.igormaznitsa.annotator.ui.api.EditorPanelContext;
+import java.util.Locale;
 
 public final class AnnotationCreateFlow {
 
@@ -33,8 +34,10 @@ public final class AnnotationCreateFlow {
     if (context instanceof ImageCanvas canvas) {
       canvas.activateSelectTool();
     }
-    context.updateStatus(
-        "Added \"%s\" — double-click shape to edit label and fill".formatted(entry.id()));
+    context.updateStatus(String.format(
+        Locale.ROOT,
+        "Added \"%s\" — double-click shape to edit label and fill",
+        entry.id()));
     context.repaintCanvas();
     return entry;
   }
