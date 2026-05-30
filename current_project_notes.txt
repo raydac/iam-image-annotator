@@ -3,11 +3,16 @@
 - 2026-05-30: Reworked magic-wand contour tracing to emit ordered border-edge polygons and added regression coverage for simple, non-crossing wand output.
 - 2026-05-30: Added a translucent glass-pane spinner while opening PNG sessions so slow image decoding no longer looks like an application freeze.
 - 2026-05-30: Hardened magic-wand contour fallback so the click point is never injected as a boundary vertex.
+- 2026-05-30: Added per-annotation visibility state with layer dialog toggles; hidden regions are not drawn or selectable.
+- 2026-05-30: Saved PNG preview raster now renders hidden annotations as unfilled dashed light-gray outlines.
+- 2026-05-30: Save, Save As, Save All, and exit-time Save All now run through the busy overlay progress worker.
+- 2026-05-30: Saved annotated PNGs now request maximum PNG compression for both display raster and embedded base image.
 
 ## 2. Architecture & Technical Discoveries
 - Java 21 Maven project; use `mvn22` for builds and tests.
 - Main app module is `iam-image-annotator-app`; Windows launcher is only included by the `publish` Maven profile.
 - PNG annotation persistence is handled through custom PNG chunks and JSON serialization.
+- Annotation JSON supports `visible`; missing values default to visible for backward compatibility.
 - Magic wand flood-fill masks are converted to polygon annotations in `MagicWandMaskContour`; border-edge tracing is used to avoid cycles from irregular boundary-pixel ordering.
 - `MainFrame` opens new image sessions through a `SwingWorker` plus a glass-pane busy overlay; existing-open tabs are selected immediately.
 

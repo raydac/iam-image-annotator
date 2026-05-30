@@ -60,6 +60,23 @@ class AnnotationJsonCodecTest {
   }
 
   @Test
+  void roundTripVisibilityFlag() {
+    final AnnotationDocument source = new AnnotationDocument();
+    source.add(new AnnotationEntry(
+        "car",
+        AnnotationType.RECTANGLE,
+        "#00FF00",
+        AnnotationCoords.rectangle(0, 0, 0.5, 0.5),
+        false,
+        false));
+    final AnnotationJsonCodec codec = new AnnotationJsonCodec();
+    final String json = new String(codec.encode(source), StandardCharsets.UTF_8);
+    assertTrue(json.contains("\"visible\":false"));
+    final AnnotationDocument restored = codec.decode(codec.encode(source));
+    assertFalse(restored.entries().get(0).visible());
+  }
+
+  @Test
   void roundTripFillColor() {
     final AnnotationDocument source = new AnnotationDocument();
     source.add(new AnnotationEntry(
@@ -86,6 +103,16 @@ class AnnotationJsonCodecTest {
         "coords":{"x":0.1,"y":0.2,"width":0.3,"height":0.4}}]}""";
     final AnnotationDocument document = codec.decode(json.getBytes(StandardCharsets.UTF_8));
     assertFalse(document.entries().get(0).locked());
+  }
+
+  @Test
+  void missingVisibilityDefaultsToTrue() {
+    final AnnotationJsonCodec codec = new AnnotationJsonCodec();
+    final String json = """
+        {"annotations":[{"id":"wing","type":"rectangle","fillColor":"#808080",\
+        "coords":{"x":0.1,"y":0.2,"width":0.3,"height":0.4}}]}""";
+    final AnnotationDocument document = codec.decode(json.getBytes(StandardCharsets.UTF_8));
+    assertTrue(document.entries().get(0).visible());
   }
 
 }

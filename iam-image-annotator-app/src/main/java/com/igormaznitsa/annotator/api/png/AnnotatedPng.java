@@ -16,9 +16,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageInputStream;
+import javax.imageio.stream.ImageOutputStream;
 
 /**
  * Annotated PNG: display raster in IDAT, original base PNG in iBSE, JSON in iANN.
@@ -121,10 +125,27 @@ public final class AnnotatedPng {
 
   private static byte[] encodePng(final BufferedImage image) throws IOException {
     final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-    if (!ImageIO.write(image, "png", bytes)) {
+    final Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("png");
+    if (!writers.hasNext()) {
       throw new IOException("PNG encoder unavailable");
     }
+    final ImageWriter writer = writers.next();
+    try (ImageOutputStream output = ImageIO.createImageOutputStream(bytes)) {
+      writer.setOutput(output);
+      writer.write(null, new IIOImage(image, null, null), maxCompression(writer));
+    } finally {
+      writer.dispose();
+    }
     return bytes.toByteArray();
+  }
+
+  private static ImageWriteParam maxCompression(final ImageWriter writer) {
+    final ImageWriteParam param = writer.getDefaultWriteParam();
+    if (param.canWriteCompressed()) {
+      param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+      param.setCompressionQuality(0.0f);
+    }
+    return param;
   }
 
   public BufferedImage baseImage() {

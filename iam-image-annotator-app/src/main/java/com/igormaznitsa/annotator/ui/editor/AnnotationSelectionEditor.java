@@ -143,6 +143,9 @@ public final class AnnotationSelectionEditor {
       final double normY,
       final int imageWidth,
       final int imageHeight) {
+    if (!entry.visible()) {
+      return Optional.empty();
+    }
     final Optional<NormPoint> rotation = rotationHandlePosition(entry, imageWidth, imageHeight);
     if (rotation.isPresent()
         && isNearInImage(rotation.get(), normX, normY, ROTATION_HANDLE_RADIUS_PX, imageWidth,
@@ -167,7 +170,7 @@ public final class AnnotationSelectionEditor {
       final double normY) {
     for (int i = entries.size() - 1; i >= 0; i--) {
       final AnnotationEntry entry = entries.get(i);
-      if (contains(entry, normX, normY)) {
+      if (entry.visible() && contains(entry, normX, normY)) {
         return Optional.of(entry.id());
       }
     }

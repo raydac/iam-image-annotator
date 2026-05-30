@@ -57,7 +57,8 @@ public final class AnnotationDocument {
         type,
         ClassNames.normalizeColor(fillColorHex),
         coords,
-        false);
+        false,
+        true);
     return this.add(entry);
   }
 
@@ -89,6 +90,15 @@ public final class AnnotationDocument {
       return;
     }
     this.entries.set(index, current.withLocked(locked));
+  }
+
+  public void setVisible(final String id, final boolean visible) {
+    final int index = this.requireIndex(id);
+    final AnnotationEntry current = this.entries.get(index);
+    if (current.visible() == visible) {
+      return;
+    }
+    this.entries.set(index, current.withVisible(visible));
   }
 
   public void remove(final String id) {

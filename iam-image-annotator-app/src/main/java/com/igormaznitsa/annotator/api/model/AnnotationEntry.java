@@ -10,6 +10,7 @@ public final class AnnotationEntry {
   private final String fillColorHex;
   private final AnnotationCoords coords;
   private final boolean locked;
+  private final boolean visible;
 
   public AnnotationEntry(
       final String id,
@@ -25,11 +26,22 @@ public final class AnnotationEntry {
       final String fillColorHex,
       final AnnotationCoords coords,
       final boolean locked) {
+    this(id, type, fillColorHex, coords, locked, true);
+  }
+
+  public AnnotationEntry(
+      final String id,
+      final AnnotationType type,
+      final String fillColorHex,
+      final AnnotationCoords coords,
+      final boolean locked,
+      final boolean visible) {
     this.id = ClassNames.normalize(id);
     this.type = Objects.requireNonNull(type, "type");
     this.fillColorHex = ClassNames.normalizeColor(fillColorHex);
     this.coords = Objects.requireNonNull(coords, "coords");
     this.locked = locked;
+    this.visible = visible;
   }
 
   public String id() {
@@ -52,6 +64,10 @@ public final class AnnotationEntry {
     return this.locked;
   }
 
+  public boolean visible() {
+    return this.visible;
+  }
+
   public Color fillColor() {
     return Color.decode(this.fillColorHex);
   }
@@ -64,22 +80,32 @@ public final class AnnotationEntry {
   }
 
   public AnnotationEntry withId(final String newId) {
-    return new AnnotationEntry(newId, this.type, this.fillColorHex, this.coords, this.locked);
+    return new AnnotationEntry(
+        newId, this.type, this.fillColorHex, this.coords, this.locked, this.visible);
   }
 
   public AnnotationEntry withCoords(final AnnotationCoords newCoords) {
-    return new AnnotationEntry(this.id, this.type, this.fillColorHex, newCoords, this.locked);
+    return new AnnotationEntry(
+        this.id, this.type, this.fillColorHex, newCoords, this.locked, this.visible);
   }
 
   public AnnotationEntry withFillColor(final String newFillColorHex) {
-    return new AnnotationEntry(this.id, this.type, newFillColorHex, this.coords, this.locked);
+    return new AnnotationEntry(
+        this.id, this.type, newFillColorHex, this.coords, this.locked, this.visible);
   }
 
   public AnnotationEntry withType(final AnnotationType newType) {
-    return new AnnotationEntry(this.id, newType, this.fillColorHex, this.coords, this.locked);
+    return new AnnotationEntry(
+        this.id, newType, this.fillColorHex, this.coords, this.locked, this.visible);
   }
 
   public AnnotationEntry withLocked(final boolean newLocked) {
-    return new AnnotationEntry(this.id, this.type, this.fillColorHex, this.coords, newLocked);
+    return new AnnotationEntry(
+        this.id, this.type, this.fillColorHex, this.coords, newLocked, this.visible);
+  }
+
+  public AnnotationEntry withVisible(final boolean newVisible) {
+    return new AnnotationEntry(
+        this.id, this.type, this.fillColorHex, this.coords, this.locked, newVisible);
   }
 }

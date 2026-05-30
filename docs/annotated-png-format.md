@@ -37,7 +37,8 @@ IEND
 
 ### Display raster (`IDAT` and standard chunks)
 
-- Built by compositing the **base image** with vector annotations (fills, strokes, handles not included).
+- Built by compositing the **base image** with vector annotations (fills, strokes, handles not included). Hidden
+  annotations are shown as unfilled dashed light-gray outlines.
 - This is what `ImageIO` and other tools decode when opening the file as a plain PNG.
 - Color type may differ from the base (commonly **ARGB** for the composed preview).
 
@@ -101,6 +102,7 @@ Every item in `annotations` has the same top-level shape:
 | `type`      | string  | yes      | Geometry kind; see table below (stored **lowercase**)                                        |
 | `fillColor` | string  | yes      | Fill colour `#RRGGBB` (six hex digits, `#` prefix; saved upper case)                         |
 | `lock`      | boolean | no       | If `true`, shape is locked in the editor. **Omitted** when `false`                           |
+| `visible`   | boolean | no       | If `false`, shape is hidden and not selectable. Defaults to `true` when omitted              |
 | `coords`    | object  | yes      | Type-specific geometry; only relevant fields are set                                         |
 
 | `type` value  | Enum        | Description                                   |
@@ -255,6 +257,7 @@ array).
   "type": "pose2d",
   "fillColor": "#FF8800",
   "lock": true,
+   "visible": true,
   "coords": {
     "x": 0.15,
     "y": 0.10,
@@ -369,9 +372,9 @@ Implemented in `AnnotatedPng.write`:
 
 1. `baseImage` — raster under edit (no overlay).
 2. `composed` — `AnnotationOverlayRenderer.compose(baseImage, document)`.
-3. `ibse` — `encodePng(baseImage)` (full PNG bytes).
+3. `ibse` — `encodePng(baseImage)` (full PNG bytes, maximum PNG compression).
 4. `iann` — `AnnotationJsonCodec.encode(document)` (UTF-8 JSON).
-5. `composedPng` — encode composed image; parse chunks.
+5. `composedPng` — encode composed image with maximum PNG compression; parse chunks.
 6. Insert `iBSE` and `iANN` after `IHDR` via `replaceCustomChunks`.
 7. Write chunk stream to the output file.
 

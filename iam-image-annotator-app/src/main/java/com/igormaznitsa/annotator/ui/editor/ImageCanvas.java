@@ -293,6 +293,7 @@ public final class ImageCanvas extends JPanel implements EditorPanelContext {
     }
     this.session.selectedAnnotation()
         .flatMap(name -> this.session.document().findById(name))
+        .filter(AnnotationEntry::visible)
         .ifPresent(entry -> this.paintSelectionHandles(g2, imageWidth, imageHeight, entry));
     g2.dispose();
   }

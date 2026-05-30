@@ -9,6 +9,7 @@ final class AnnotationEntryJson {
   String type;
   String fillColor;
   Object lock;
+  Object visible;
   AnnotationCoordsJson coords;
 
   AnnotationEntryJson() {
@@ -19,11 +20,13 @@ final class AnnotationEntryJson {
       final String type,
       final String fillColor,
       final Object lock,
+      final Object visible,
       final AnnotationCoordsJson coords) {
     this.id = id;
     this.type = type;
     this.fillColor = fillColor;
     this.lock = lock;
+    this.visible = visible;
     this.coords = coords;
   }
 }

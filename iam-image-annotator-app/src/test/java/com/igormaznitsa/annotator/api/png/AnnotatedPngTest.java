@@ -79,6 +79,43 @@ class AnnotatedPngTest {
     assertNotEquals(baseArgb, displayArgb);
   }
 
+  private static boolean isLightGray(final int argb) {
+    final Color color = new Color(argb, true);
+    return color.getRed() > 150
+        && color.getGreen() > 150
+        && color.getBlue() > 150
+        && Math.abs(color.getRed() - color.getGreen()) < 12
+        && Math.abs(color.getGreen() - color.getBlue()) < 12;
+  }
+
+  @Test
+  void saveRendersHiddenAnnotationsAsGrayOutlinesInDisplayRaster() throws IOException {
+    final BufferedImage base = new BufferedImage(64, 48, BufferedImage.TYPE_INT_RGB);
+    final Graphics2D graphics = base.createGraphics();
+    graphics.setColor(Color.BLUE);
+    graphics.fillRect(0, 0, 64, 48);
+    graphics.dispose();
+
+    final AnnotationDocument document = new AnnotationDocument();
+    document.add(new AnnotationEntry(
+        "box",
+        AnnotationType.RECTANGLE,
+        "#ff0000",
+        AnnotationCoords.rectangle(0.25, 0.25, 0.5, 0.5),
+        false,
+        false));
+
+    final ByteArrayOutputStream written = new ByteArrayOutputStream();
+    new AnnotatedPng(base, document).write(written);
+    final PngChunkIO chunkIo = new PngChunkIO();
+    final List<PngChunk> chunks =
+        chunkIo.readAll(new ByteArrayInputStream(written.toByteArray()));
+    final BufferedImage display = ImageIO.read(chunkIo.toInputStream(chunkIo.toDisplayPng(chunks)));
+
+    assertEquals(Color.BLUE.getRGB(), display.getRGB(32, 24));
+    assertTrue(isLightGray(display.getRGB(16, 24)));
+  }
+
   @Test
   void rejectsCorruptedIbseChunk() throws IOException {
     final BufferedImage base = new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB);

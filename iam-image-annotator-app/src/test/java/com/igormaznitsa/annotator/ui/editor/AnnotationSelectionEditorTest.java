@@ -85,4 +85,17 @@ class AnnotationSelectionEditorTest {
     assertFalse(AnnotationSelectionEditor.canRemoveVertex(entry, 0));
     assertTrue(AnnotationSelectionEditor.removeVertex(entry, 0).isEmpty());
   }
+
+  @Test
+  void hiddenAnnotationCannotBeHit() {
+    final AnnotationEntry entry = new AnnotationEntry(
+        "cat",
+        AnnotationType.RECTANGLE,
+        "#ff0000",
+        AnnotationCoords.rectangle(0.2, 0.2, 0.6, 0.6),
+        false,
+        false);
+    assertTrue(AnnotationSelectionEditor.hitAnnotation(List.of(entry), 0.5, 0.5).isEmpty());
+    assertTrue(AnnotationSelectionEditor.hitHandle(entry, 0.5, 0.5, 1000, 1000).isEmpty());
+  }
 }

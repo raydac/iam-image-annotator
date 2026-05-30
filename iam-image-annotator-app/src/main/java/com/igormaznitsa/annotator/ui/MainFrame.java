@@ -298,13 +298,8 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
       return;
     }
     if (choice == 0) {
-      try {
-        this.workspace.saveAll();
-        this.fileTree.refresh();
-      } catch (final IOException exception) {
-        this.showError("Save failed: " + exception.getMessage());
-        return;
-      }
+      this.saveDirtySessionsWithProgress(this::exitApplication);
+      return;
     }
     this.exitApplication();
   }
@@ -491,13 +486,15 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     if (canvas == null) {
       return;
     }
-    try {
-      this.saveSessionToTarget(canvas.session());
-      this.fileTree.refresh();
-      this.onEditorStateChanged();
-    } catch (final IOException exception) {
-      this.showError(exception.getMessage());
-    }
+    final EditorSession session = canvas.session();
+    this.statusLabel.setText("Saving " + session.filePath().getFileName() + "...");
+    this.runWithProgress(
+        () -> {
+          this.saveSessionToTarget(session);
+          return session;
+        },
+        saved -> this.afterSave("Saved " + saved.filePath().getFileName()),
+        exception -> this.showError("Save failed: " + exception.getMessage()));
   }
 
   private void saveActiveAs() {
@@ -511,29 +508,57 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
       return;
     }
-    try {
-      final Path source = canvas.session().filePath();
-      final Path target = chooser.getSelectedFile().toPath();
-      canvas.session().save(target);
-      this.workspace.close(source);
-      canvas.session().rekey(target);
-      this.editorTabs.rekeySession(source, target);
-      this.workspace.open(canvas.session());
-      this.fileTree.refresh();
-      this.onEditorStateChanged();
-    } catch (final IOException exception) {
-      this.showError(exception.getMessage());
-    }
+    final EditorSession session = canvas.session();
+    final Path source = session.filePath();
+    final Path target = chooser.getSelectedFile().toPath();
+    this.statusLabel.setText("Saving " + target.getFileName() + "...");
+    this.runWithProgress(
+        () -> {
+          session.save(target);
+          return new SaveAsResult(source, target, session);
+        },
+        this::afterSaveAs,
+        exception -> this.showError("Save failed: " + exception.getMessage()));
   }
 
   private void saveAll() {
-    try {
-      this.workspace.saveAll();
-      this.fileTree.refresh();
-      this.onEditorStateChanged();
-    } catch (final IOException exception) {
-      this.showError(exception.getMessage());
+    this.saveDirtySessionsWithProgress(() -> {
+    });
+  }
+
+  private void saveDirtySessionsWithProgress(final Runnable onSuccess) {
+    final List<EditorSession> dirtySessions = this.workspace.dirtySessions();
+    if (dirtySessions.isEmpty()) {
+      onSuccess.run();
+      return;
     }
+    this.statusLabel.setText("Saving " + dirtySessions.size() + " file(s)...");
+    this.runWithProgress(
+        () -> {
+          for (final EditorSession session : dirtySessions) {
+            this.saveSessionToTarget(session);
+          }
+          return dirtySessions.size();
+        },
+        count -> {
+          this.afterSave("Saved " + count + " file(s)");
+          onSuccess.run();
+        },
+        exception -> this.showError("Save failed: " + exception.getMessage()));
+  }
+
+  private void afterSave(final String statusText) {
+    this.fileTree.refresh();
+    this.statusLabel.setText(statusText);
+    this.onEditorStateChanged();
+  }
+
+  private void afterSaveAs(final SaveAsResult result) {
+    this.workspace.close(result.source());
+    result.session().rekey(result.target());
+    this.editorTabs.rekeySession(result.source(), result.target());
+    this.workspace.open(result.session());
+    this.afterSave("Saved " + result.target().getFileName());
   }
 
   private void onEditorStateChanged() {
@@ -670,5 +695,8 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
             18);
       }
     }
+  }
+
+  private record SaveAsResult(Path source, Path target, EditorSession session) {
   }
 }

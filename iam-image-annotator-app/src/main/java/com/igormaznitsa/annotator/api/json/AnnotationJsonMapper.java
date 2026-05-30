@@ -43,6 +43,7 @@ final class AnnotationJsonMapper {
         entry.type().jsonName(),
         entry.fillColorHex(),
         entry.locked() ? Boolean.TRUE : null,
+        entry.visible(),
         toCoordsJson(entry.type(), entry.coords()));
   }
 
@@ -57,18 +58,23 @@ final class AnnotationJsonMapper {
     if (json.coords == null) {
       throw new IllegalArgumentException("coords must be an object");
     }
-    return new AnnotationEntry(id, type, fillColor, toCoords(type, json.coords),
-        parseLock(json.lock));
+    return new AnnotationEntry(
+        id,
+        type,
+        fillColor,
+        toCoords(type, json.coords),
+        parseBoolean(json.lock, false),
+        parseBoolean(json.visible, true));
   }
 
-  private static boolean parseLock(final Object lock) {
-    if (lock instanceof Boolean value) {
+  private static boolean parseBoolean(final Object source, final boolean defaultValue) {
+    if (source instanceof Boolean value) {
       return value;
     }
-    if (lock instanceof Number number) {
+    if (source instanceof Number number) {
       return number.intValue() != 0;
     }
-    return false;
+    return defaultValue;
   }
 
   private static AnnotationCoordsJson toCoordsJson(final AnnotationType type,

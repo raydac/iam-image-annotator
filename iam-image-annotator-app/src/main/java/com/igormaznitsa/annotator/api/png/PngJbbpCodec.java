@@ -14,14 +14,15 @@ import java.util.List;
  */
 public final class PngJbbpCodec {
 
-  private static final String PNG_SCRIPT = ""
-      + "long header;"
-      + "chunk [_]{"
-      + "   int length; "
-      + "   int type; "
-      + "   byte[length] data; "
-      + "   int crc;"
-      + "}";
+  private static final String PNG_SCRIPT = """
+      long header;
+      chunk [_]{
+         int length;
+         int type;
+         byte[length] data;
+         int crc;
+      }
+      """;
 
   private static final JBBPParser PARSER = JBBPParser.prepare(PNG_SCRIPT);
 

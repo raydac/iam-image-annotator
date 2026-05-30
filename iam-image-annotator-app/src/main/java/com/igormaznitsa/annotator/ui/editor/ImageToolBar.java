@@ -88,7 +88,7 @@ public final class ImageToolBar extends JPanel {
     this.configureToolbarButton(layerButton, "layer_arrange.png");
     layerButton.setToolTipText("Edit annotation layer order and names");
     layerButton.addActionListener(
-        event -> LayerOrderDialog.showFor(this.frame, this.canvas.session()));
+        event -> LayerOrderDialog.showFor(this.frame, this.canvas));
     this.addToolbarButton(layerButton);
     this.add(Box.createVerticalGlue());
   }

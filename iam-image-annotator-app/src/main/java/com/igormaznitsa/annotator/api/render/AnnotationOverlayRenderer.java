@@ -25,6 +25,14 @@ public final class AnnotationOverlayRenderer {
   private static final float STROKE_ALPHA = 0.9f;
   private static final Color DRAFT_COLOR = new Color(255, 220, 0);
   private static final Color DRAFT_OUTLINE = new Color(0, 0, 0, 200);
+  private static final Color HIDDEN_PREVIEW_STROKE = new Color(210, 210, 210);
+  private static final BasicStroke HIDDEN_PREVIEW_DASHED_STROKE = new BasicStroke(
+      2.0f,
+      BasicStroke.CAP_ROUND,
+      BasicStroke.JOIN_ROUND,
+      0.0f,
+      new float[] {8.0f, 6.0f},
+      0.0f);
 
   public BufferedImage compose(final BufferedImage base, final AnnotationDocument document) {
     Objects.requireNonNull(base, "base");
@@ -35,9 +43,23 @@ public final class AnnotationOverlayRenderer {
     final Graphics2D graphics = composed.createGraphics();
     graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
     graphics.drawImage(base, 0, 0, null);
-    this.paintAnnotations(graphics, base.getWidth(), base.getHeight(), document, true);
+    this.paintPreviewAnnotations(graphics, base.getWidth(), base.getHeight(), document);
     graphics.dispose();
     return composed;
+  }
+
+  private void paintPreviewAnnotations(
+      final Graphics2D graphics,
+      final int imageWidth,
+      final int imageHeight,
+      final AnnotationDocument document) {
+    for (final AnnotationEntry entry : document.entries()) {
+      if (entry.visible()) {
+        this.paintAnnotation(graphics, imageWidth, imageHeight, entry, true, false);
+      } else {
+        this.paintHiddenPreviewAnnotation(graphics, imageWidth, imageHeight, entry);
+      }
+    }
   }
 
   public void paintAnnotations(
@@ -47,6 +69,9 @@ public final class AnnotationOverlayRenderer {
       final AnnotationDocument document,
       final boolean filled) {
     for (final AnnotationEntry entry : document.entries()) {
+      if (!entry.visible()) {
+        continue;
+      }
       this.paintAnnotation(graphics, imageWidth, imageHeight, entry, filled, false);
     }
   }
@@ -69,6 +94,9 @@ public final class AnnotationOverlayRenderer {
       final boolean filled,
       final boolean selected,
       final double zoom) {
+    if (!entry.visible()) {
+      return;
+    }
     final Color strokeColor = entry.strokeColor();
     final Color fillColor = entry.fillColor();
     final AnnotationCoords coords = entry.coords();
@@ -89,6 +117,50 @@ public final class AnnotationOverlayRenderer {
           graphics, imageWidth, imageHeight, strokeColor, fillColor, coords.corners(), filled,
           selected, zoom);
     }
+  }
+
+  private void paintHiddenPreviewAnnotation(
+      final Graphics2D graphics,
+      final int imageWidth,
+      final int imageHeight,
+      final AnnotationEntry entry) {
+    final AnnotationCoords coords = entry.coords();
+    graphics.setStroke(HIDDEN_PREVIEW_DASHED_STROKE);
+    switch (entry.type()) {
+      case RECTANGLE, POSE2D -> this.paintHiddenPreviewRectangle(
+          graphics, imageWidth, imageHeight, coords);
+      case POLYGON -> this.paintHiddenPreviewPolygon(graphics, imageWidth, imageHeight,
+          coords.points());
+      case OBB -> this.paintHiddenPreviewPolygon(graphics, imageWidth, imageHeight,
+          coords.corners());
+    }
+  }
+
+  private void paintHiddenPreviewRectangle(
+      final Graphics2D graphics,
+      final int imageWidth,
+      final int imageHeight,
+      final AnnotationCoords coords) {
+    graphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
+    graphics.setColor(HIDDEN_PREVIEW_STROKE);
+    graphics.draw(new Rectangle2D.Double(
+        coords.x() * imageWidth,
+        coords.y() * imageHeight,
+        coords.width() * imageWidth,
+        coords.height() * imageHeight));
+  }
+
+  private void paintHiddenPreviewPolygon(
+      final Graphics2D graphics,
+      final int imageWidth,
+      final int imageHeight,
+      final List<NormPoint> points) {
+    if (points.size() < 2) {
+      return;
+    }
+    graphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
+    graphics.setColor(HIDDEN_PREVIEW_STROKE);
+    graphics.drawPolygon(this.toPolygon(points, imageWidth, imageHeight));
   }
 
   private void paintObb(
