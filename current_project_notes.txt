@@ -7,6 +7,8 @@
 - 2026-05-30: Saved PNG preview raster now renders hidden annotations as unfilled dashed light-gray outlines.
 - 2026-05-30: Save, Save As, Save All, and exit-time Save All now run through the busy overlay progress worker.
 - 2026-05-30: Saved annotated PNGs now request maximum PNG compression for both display raster and embedded base image.
+- 2026-05-30: Extracted reusable `ProgressGlassPane` with optional operation-stage text for long UI tasks.
+- 2026-05-30: Optimized image open path: annotation detection skips PNG payloads and plain PNGs decode directly via ImageIO.
 
 ## 2. Architecture & Technical Discoveries
 - Java 21 Maven project; use `mvn22` for builds and tests.
@@ -14,7 +16,7 @@
 - PNG annotation persistence is handled through custom PNG chunks and JSON serialization.
 - Annotation JSON supports `visible`; missing values default to visible for backward compatibility.
 - Magic wand flood-fill masks are converted to polygon annotations in `MagicWandMaskContour`; border-edge tracing is used to avoid cycles from irregular boundary-pixel ordering.
-- `MainFrame` opens new image sessions through a `SwingWorker` plus a glass-pane busy overlay; existing-open tabs are selected immediately.
+- `MainFrame` runs long open/save tasks through a `SwingWorker` plus reusable `ProgressGlassPane`; existing-open tabs are selected immediately.
 
 ## 3. Technical Debt & Refactoring
 - Some Swing UI methods return `null` internally for optional UI state; consider tightening to `Optional` where it improves call-site clarity.

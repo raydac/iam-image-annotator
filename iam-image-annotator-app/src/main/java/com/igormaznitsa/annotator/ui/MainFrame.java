@@ -5,6 +5,7 @@ import com.igormaznitsa.annotator.api.png.AnnotatedPng;
 import com.igormaznitsa.annotator.api.service.AllowedImageFiles;
 import com.igormaznitsa.annotator.api.service.EditorSession;
 import com.igormaznitsa.annotator.ui.api.TreeOperationContext;
+import com.igormaznitsa.annotator.ui.component.ProgressGlassPane;
 import com.igormaznitsa.annotator.ui.dialog.SettingsDialog;
 import com.igormaznitsa.annotator.ui.dialog.ShowJsonDialog;
 import com.igormaznitsa.annotator.ui.editor.EditorTabbedPane;
@@ -28,18 +29,10 @@ import com.igormaznitsa.annotator.ui.tools.ZoomInAction;
 import com.igormaznitsa.annotator.ui.tools.ZoomOutAction;
 import com.igormaznitsa.annotator.ui.tree.FileTreePanel;
 import com.igormaznitsa.annotator.ui.tree.TreeOperationBar;
-import java.awt.AlphaComposite;
-import java.awt.BasicStroke;
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Dimension;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
 import java.awt.event.InputEvent;
-import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
-import java.awt.event.MouseAdapter;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
@@ -64,7 +57,6 @@ import javax.swing.JRootPane;
 import javax.swing.JSplitPane;
 import javax.swing.KeyStroke;
 import javax.swing.SwingWorker;
-import javax.swing.Timer;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
 public final class MainFrame extends JFrame implements TreeOperationContext {
@@ -90,7 +82,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
   private final List<com.igormaznitsa.annotator.ui.api.ImageViewToggle> viewToggles =
       List.of(new GridToggle());
   private final EditorTabbedPane editorTabs;
-  private final BusyGlassPane busyGlassPane = new BusyGlassPane();
+  private final ProgressGlassPane progressGlassPane = new ProgressGlassPane();
   private final JLabel statusLabel = new JLabel("Ready");
   private int progressTaskCount;
 
@@ -124,7 +116,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     this.setMinimumSize(new Dimension(1100, 700));
     this.setJMenuBar(this.buildMenuBar());
     this.setContentPane(this.buildContent());
-    this.setGlassPane(this.busyGlassPane);
+    this.setGlassPane(this.progressGlassPane);
     this.wireEvents();
     this.treeOperations.bind(this);
     this.updateMenuItems();
@@ -175,7 +167,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
   @Override
   public void runWithProgress(final String title, final Runnable task,
                               final Consumer<Exception> onError) {
-    this.runWithProgress(() -> {
+    this.runWithProgress(title, () -> {
       task.run();
       return null;
     }, ignored -> {
@@ -397,6 +389,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
   private void openNewSessionWithProgress(final Path path) {
     this.workspace.close(path);
     this.runWithProgress(
+        "Opening " + path.getFileName() + "...",
         () -> this.loadSession(path),
         this::showSession,
         exception -> this.showError("Open failed: " + exception.getMessage()));
@@ -415,21 +408,18 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     if (AnnotatedPng.hasAnnotationChunks(path)) {
       return EditorSession.open(path);
     }
-    try {
-      return EditorSession.open(path);
-    } catch (final IOException exception) {
-      final BufferedImage image = ImageIO.read(path.toFile());
-      if (image != null) {
-        return EditorSession.fromImage(path, image);
-      }
-      throw exception;
+    final BufferedImage image = ImageIO.read(path.toFile());
+    if (image == null) {
+      throw new IOException("Unable to decode PNG image: " + path);
     }
+    return EditorSession.fromImage(path, image);
   }
 
-  private <T> void runWithProgress(final Callable<T> task,
+  private <T> void runWithProgress(final String message,
+                                   final Callable<T> task,
                                    final Consumer<T> onSuccess,
                                    final Consumer<Exception> onError) {
-    this.showBusyOverlay();
+    this.showProgressOverlay(message);
     final SwingWorker<T, Void> worker = new SwingWorker<>() {
       @Override
       protected T doInBackground() throws Exception {
@@ -449,14 +439,14 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
                                         final Consumer<Exception> onError) {
     try {
       final T result = worker.get();
-      this.hideBusyOverlay();
+      this.hideProgressOverlay();
       onSuccess.accept(result);
     } catch (final InterruptedException exception) {
       Thread.currentThread().interrupt();
-      this.hideBusyOverlay();
+      this.hideProgressOverlay();
       onError.accept(exception);
     } catch (final ExecutionException exception) {
-      this.hideBusyOverlay();
+      this.hideProgressOverlay();
       onError.accept(this.toException(exception.getCause()));
     }
   }
@@ -465,15 +455,15 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     return cause instanceof Exception exception ? exception : new Exception(cause);
   }
 
-  private void showBusyOverlay() {
+  private void showProgressOverlay(final String message) {
     this.progressTaskCount++;
-    this.busyGlassPane.start();
+    this.progressGlassPane.start(message);
   }
 
-  private void hideBusyOverlay() {
+  private void hideProgressOverlay() {
     this.progressTaskCount = Math.max(0, this.progressTaskCount - 1);
     if (this.progressTaskCount == 0) {
-      this.busyGlassPane.stop();
+      this.progressGlassPane.stop();
     }
   }
 
@@ -489,6 +479,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     final EditorSession session = canvas.session();
     this.statusLabel.setText("Saving " + session.filePath().getFileName() + "...");
     this.runWithProgress(
+        "Saving " + session.filePath().getFileName() + "...",
         () -> {
           this.saveSessionToTarget(session);
           return session;
@@ -513,6 +504,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     final Path target = chooser.getSelectedFile().toPath();
     this.statusLabel.setText("Saving " + target.getFileName() + "...");
     this.runWithProgress(
+        "Saving " + target.getFileName() + "...",
         () -> {
           session.save(target);
           return new SaveAsResult(source, target, session);
@@ -534,6 +526,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     }
     this.statusLabel.setText("Saving " + dirtySessions.size() + " file(s)...");
     this.runWithProgress(
+        "Saving " + dirtySessions.size() + " file(s)...",
         () -> {
           for (final EditorSession session : dirtySessions) {
             this.saveSessionToTarget(session);
@@ -616,85 +609,6 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     this.undoItem.setEnabled(hasActiveEditor && canvas.session().canUndo());
     this.redoItem.setEnabled(hasActiveEditor && canvas.session().canRedo());
     this.showJsonItem.setEnabled(hasActiveEditor);
-  }
-
-  private static final class BusyGlassPane extends JPanel {
-
-    private static final int FRAME_DELAY_MS = 40;
-    private static final int OVERLAY_ALPHA = 128;
-    private static final int SPINNER_SIZE = 64;
-    private static final int SPINNER_STROKE = 7;
-    private static final int ARC_COUNT = 12;
-    private static final Color OVERLAY_COLOR = new Color(0, 0, 0, OVERLAY_ALPHA);
-    private static final Color SPINNER_COLOR = new Color(36, 196, 112);
-    private int frame;
-    private final Timer timer = new Timer(FRAME_DELAY_MS, event -> this.rotate());
-
-    private BusyGlassPane() {
-      this.setOpaque(false);
-      this.setVisible(false);
-      this.setFocusable(true);
-      this.addMouseListener(new MouseAdapter() {
-      });
-      this.addMouseMotionListener(new MouseAdapter() {
-      });
-      this.addMouseWheelListener(event -> {
-      });
-      this.addKeyListener(new KeyAdapter() {
-      });
-    }
-
-    private void start() {
-      this.frame = 0;
-      this.setVisible(true);
-      this.requestFocusInWindow();
-      this.timer.start();
-      this.repaint();
-    }
-
-    private void stop() {
-      this.timer.stop();
-      this.setVisible(false);
-    }
-
-    private void rotate() {
-      this.frame = (this.frame + 1) % ARC_COUNT;
-      this.repaint();
-    }
-
-    @Override
-    protected void paintComponent(final Graphics graphics) {
-      super.paintComponent(graphics);
-      final Graphics2D canvas = (Graphics2D) graphics.create();
-      try {
-        this.paintOverlay(canvas);
-        this.paintSpinner(canvas);
-      } finally {
-        canvas.dispose();
-      }
-    }
-
-    private void paintOverlay(final Graphics2D canvas) {
-      canvas.setColor(OVERLAY_COLOR);
-      canvas.fillRect(0, 0, this.getWidth(), this.getHeight());
-    }
-
-    private void paintSpinner(final Graphics2D canvas) {
-      canvas.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-      canvas.setStroke(new BasicStroke(SPINNER_STROKE, BasicStroke.CAP_ROUND,
-          BasicStroke.JOIN_ROUND));
-
-      final int left = (this.getWidth() - SPINNER_SIZE) / 2;
-      final int top = (this.getHeight() - SPINNER_SIZE) / 2;
-      for (int i = 0; i < ARC_COUNT; i++) {
-        final float alpha = (i + 1.0f) / ARC_COUNT;
-        canvas.setComposite(AlphaComposite.SrcOver.derive(alpha));
-        canvas.setColor(SPINNER_COLOR);
-        canvas.drawArc(left, top, SPINNER_SIZE, SPINNER_SIZE,
-            90 - ((this.frame + i) % ARC_COUNT) * 360 / ARC_COUNT,
-            18);
-      }
-    }
   }
 
   private record SaveAsResult(Path source, Path target, EditorSession session) {

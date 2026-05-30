@@ -6,6 +6,7 @@ import com.igormaznitsa.annotator.api.render.AnnotationOverlayRenderer;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -44,15 +45,29 @@ public final class AnnotatedPng {
   }
 
   public static boolean hasAnnotationChunks(final InputStream input) throws IOException {
-    final PngChunkIO chunkIo = new PngChunkIO();
-    return chunkIo.readAll(input).stream()
-        .anyMatch(chunk -> PngConstants.isIannChunk(chunk.type()));
+    final DataInputStream data = new DataInputStream(input);
+    if (!isPngFile(data.readNBytes(PngConstants.SIGNATURE.length))) {
+      return false;
+    }
+    while (true) {
+      final int length = data.readInt();
+      if (length < 0) {
+        throw new IOException("Invalid PNG chunk length: " + length);
+      }
+      final String type = PngChunkType.decode(data.readInt());
+      if (PngConstants.isIannChunk(type)) {
+        return true;
+      }
+      data.skipNBytes((long) length + Integer.BYTES);
+      if ("IEND".equals(type)) {
+        return false;
+      }
+    }
   }
 
   public static AnnotatedPng read(final InputStream input) throws IOException {
     final PngChunkIO chunkIo = new PngChunkIO();
-    final byte[] fileBytes = chunkIo.readAllBytes(input);
-    final List<PngChunk> chunks = chunkIo.readAll(new ByteArrayInputStream(fileBytes));
+    final List<PngChunk> chunks = chunkIo.readAll(input);
 
     final AnnotationDocument document = resolveDocument(chunks);
     final BufferedImage baseImage = resolveBaseImage(chunkIo, chunks);

@@ -1,6 +1,7 @@
 package com.igormaznitsa.annotator.api.png;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -40,6 +41,28 @@ class AnnotatedPngTest {
     assertEquals(base.getWidth(), read.baseImage().getWidth());
     assertEquals(base.getHeight(), read.baseImage().getHeight());
     assertEquals(1, read.document().entries().size());
+  }
+
+  @Test
+  void detectsAnnotationChunksWithoutFullDecode() throws IOException {
+    final BufferedImage base = new BufferedImage(16, 16, BufferedImage.TYPE_INT_RGB);
+    final ByteArrayOutputStream plain = new ByteArrayOutputStream();
+    ImageIO.write(base, "png", plain);
+
+    assertFalse(AnnotatedPng.hasAnnotationChunks(
+        new ByteArrayInputStream(plain.toByteArray())));
+
+    final AnnotationDocument document = new AnnotationDocument();
+    document.add(new AnnotationEntry(
+        "box",
+        AnnotationType.RECTANGLE,
+        "#ff0000",
+        AnnotationCoords.rectangle(0.1, 0.1, 0.4, 0.3)));
+    final ByteArrayOutputStream annotated = new ByteArrayOutputStream();
+    new AnnotatedPng(base, document).write(annotated);
+
+    assertTrue(AnnotatedPng.hasAnnotationChunks(
+        new ByteArrayInputStream(annotated.toByteArray())));
   }
 
   @Test
