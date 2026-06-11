@@ -5,6 +5,7 @@ import com.igormaznitsa.annotator.ui.icons.IconService;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.awt.Frame;
+import java.awt.Insets;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
 import java.nio.file.Path;
@@ -18,6 +19,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
+import javax.swing.border.EmptyBorder;
 
 public final class EditorTabbedPane extends JTabbedPane {
 
@@ -183,22 +185,34 @@ public final class EditorTabbedPane extends JTabbedPane {
   }
 
   private JPanel createTabComponent(final EditorSession session, final String title) {
-    final JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+    final JPanel panel = new JPanel(new BorderLayout(6, 0));
     panel.setOpaque(false);
-    panel.add(new JLabel(title));
-    final JButton reveal = new JButton(this.icons.icon16("folder_explorer.png"));
+    final JLabel label = new JLabel(title);
+    label.setBorder(new EmptyBorder(0, 0, 0, 6));
+    panel.add(label, BorderLayout.CENTER);
+
+    final JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+    buttons.setOpaque(false);
+    final JButton reveal = this.createTabButton("folder_explorer.png");
     reveal.setToolTipText("Reveal in file tree");
-    reveal.setBorderPainted(false);
-    reveal.setContentAreaFilled(false);
     reveal.addActionListener(event -> this.revealInTreeListener.accept(session.filePath()));
-    panel.add(reveal);
-    final JButton close = new JButton(this.icons.icon16("cross.png"));
+    buttons.add(reveal);
+    final JButton close = this.createTabButton("cross.png");
     close.setToolTipText("Close");
-    close.setBorderPainted(false);
-    close.setContentAreaFilled(false);
     close.addActionListener(event -> this.closeSession(session.filePath()));
-    panel.add(close);
+    buttons.add(close);
+    panel.add(buttons, BorderLayout.EAST);
     return panel;
+  }
+
+  private JButton createTabButton(final String iconFileName) {
+    final JButton button = new JButton(this.icons.icon16(iconFileName));
+    button.setBorderPainted(false);
+    button.setContentAreaFilled(false);
+    button.setFocusable(false);
+    button.setMargin(new Insets(0, 0, 0, 0));
+    button.setBorder(new EmptyBorder(0, 1, 0, 1));
+    return button;
   }
 
   private EditorSession sessionAt(final int index) {
