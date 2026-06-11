@@ -193,7 +193,7 @@ public final class EditorTabbedPane extends JTabbedPane {
 
     final JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
     buttons.setOpaque(false);
-    final JButton reveal = this.createTabButton("folder_explorer.png");
+    final JButton reveal = this.createTabButton("find.png");
     reveal.setToolTipText("Reveal in file tree");
     reveal.addActionListener(event -> this.revealInTreeListener.accept(session.filePath()));
     buttons.add(reveal);

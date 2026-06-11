@@ -16,6 +16,8 @@
 - 2026-06-11: Image editor canvas now centers smaller images and paints a checkerboard background around them to show image boundaries.
 - 2026-06-11: File tree opens images only on explicit activation (double-click or Enter), including already-selected closed rows; dirty tab close dialog uses OK/Cancel only.
 - 2026-06-11: Editor tab action icons are now compact and right-aligned within the tab header.
+- 2026-06-11: Refresh tree and reveal-in-tree actions now use dedicated `arrow_refresh.png` and `find.png` icons.
+- 2026-06-11: File tree folders now use Swing Look & Feel `Tree.closedIcon`/`Tree.openIcon` with `folder.png` fallback instead of `box_open.png`.
 
 ## 2. Architecture & Technical Discoveries
 - Java 21 Maven project; use `mvn22` for builds and tests.
@@ -31,7 +33,7 @@
 - Some Swing UI methods return `null` internally for optional UI state; consider tightening to `Optional` where it improves call-site clarity.
 
 ## 4. Current Work In Progress
-- Editor tab icon layout cleanup completed; `mvn22 -pl iam-image-annotator-app test` passes.
+- Standard Swing tree folder icon pair applied; `mvn22 -pl iam-image-annotator-app test` passes.
 
 ## 5. Known Issues & Limitations
 - No changelog file is present in the project root.

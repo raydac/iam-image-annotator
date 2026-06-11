@@ -17,7 +17,7 @@ public final class RefreshTreeOperation implements TreeOperationIcon {
 
   @Override
   public String iconFileName() {
-    return "folder_explorer.png";
+    return "arrow_refresh.png";
   }
 
   @Override

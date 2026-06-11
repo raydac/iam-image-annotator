@@ -23,9 +23,11 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import javax.swing.AbstractAction;
+import javax.swing.Icon;
 import javax.swing.JScrollPane;
 import javax.swing.JTree;
 import javax.swing.KeyStroke;
+import javax.swing.UIManager;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
@@ -271,6 +273,8 @@ public final class FileTreePanel extends JScrollPane {
   private static final class FileTreeCellRenderer extends DefaultTreeCellRenderer {
 
     private final IconService icons;
+    private final Icon closedFolderIcon = UIManager.getIcon("Tree.closedIcon");
+    private final Icon openFolderIcon = UIManager.getIcon("Tree.openIcon");
 
     private FileTreeCellRenderer(final IconService icons) {
       this.icons = icons;
@@ -297,14 +301,18 @@ public final class FileTreePanel extends JScrollPane {
         if (user instanceof FileTreeNode node) {
           this.setText(node.path().getFileName().toString());
           if (Files.isDirectory(node.path())) {
-            this.setIcon(
-                expanded ? this.icons.icon16("box_open.png") : this.icons.icon16("folder.png"));
+            this.setIcon(this.folderIcon(expanded));
           } else {
             this.setIcon(this.icons.icon16("image.png"));
           }
         }
       }
       return this;
+    }
+
+    private Icon folderIcon(final boolean expanded) {
+      final Icon icon = expanded ? this.openFolderIcon : this.closedFolderIcon;
+      return icon == null ? this.icons.icon16("folder.png") : icon;
     }
   }
 }
