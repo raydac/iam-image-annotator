@@ -7,11 +7,9 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.util.Locale;
 import java.util.Optional;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
-import javax.swing.JColorChooser;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -29,14 +27,14 @@ public final class ShapeEditDialog {
     swatch.setPreferredSize(new Dimension(48, 24));
     swatch.setBackground(fillColor[0]);
     swatch.setBorder(BorderFactory.createLineBorder(Color.DARK_GRAY));
-    final JLabel fillLabel = new JLabel(toHex(fillColor[0]));
+    final JLabel fillLabel = new JLabel(ColorChooserDialog.toHex(fillColor[0]));
     final JButton chooseFill = new JButton("Choose…");
     chooseFill.addActionListener(event -> {
-      final Color chosen = JColorChooser.showDialog(parent, "Fill color", fillColor[0]);
-      if (chosen != null) {
-        fillColor[0] = chosen;
+      final Optional<Color> chosen = ColorChooserDialog.show(parent, "Fill color", fillColor[0]);
+      if (chosen.isPresent()) {
+        fillColor[0] = chosen.get();
         swatch.setBackground(fillColor[0]);
-        fillLabel.setText(toHex(fillColor[0]));
+        fillLabel.setText(ColorChooserDialog.toHex(fillColor[0]));
       }
     });
     final JPanel fillRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
@@ -62,17 +60,13 @@ public final class ShapeEditDialog {
     }
     try {
       final String id = ClassNames.normalize(idField.getText().trim());
-      final String fillHex = ClassNames.normalizeColor(toHex(fillColor[0]));
+      final String fillHex = ClassNames.normalizeColor(ColorChooserDialog.toHex(fillColor[0]));
       return Optional.of(new Result(id, fillHex));
     } catch (final IllegalArgumentException exception) {
       JOptionPane.showMessageDialog(parent, exception.getMessage(), "Invalid input",
           JOptionPane.ERROR_MESSAGE);
       return show(parent, entry);
     }
-  }
-
-  private static String toHex(final Color color) {
-    return String.format(Locale.ROOT, "#%06X", color.getRGB() & 0xFFFFFF);
   }
 
   public record Result(String id, String fillColorHex) {

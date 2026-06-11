@@ -114,7 +114,7 @@ public final class ImageToolBar extends JPanel {
       button.setToolTipText(toggle.tooltip());
       button.addActionListener(event -> {
         toggle.setSelected(this.canvas, button.isSelected());
-        this.refreshViewToggles(this.canvas);
+        this.refreshToolbarState(this.canvas);
       });
       this.viewToggleButtons.put(toggle, button);
       this.addToolbarButton(button);
@@ -148,6 +148,7 @@ public final class ImageToolBar extends JPanel {
       }
     }
     selected.activate(this.canvas);
+    this.refreshToolbarState(this.canvas);
   }
 
   public void selectDefaultTool() {

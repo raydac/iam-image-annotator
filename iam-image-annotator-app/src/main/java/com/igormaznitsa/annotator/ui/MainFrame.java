@@ -21,6 +21,7 @@ import com.igormaznitsa.annotator.ui.tools.AddVertexAction;
 import com.igormaznitsa.annotator.ui.tools.GridToggle;
 import com.igormaznitsa.annotator.ui.tools.LockSelectedToggle;
 import com.igormaznitsa.annotator.ui.tools.MagicWandTool;
+import com.igormaznitsa.annotator.ui.tools.MaskColorTool;
 import com.igormaznitsa.annotator.ui.tools.ObboxTool;
 import com.igormaznitsa.annotator.ui.tools.PolygonTool;
 import com.igormaznitsa.annotator.ui.tools.RectangleTool;
@@ -106,6 +107,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
                 new RectangleTool(),
                 new PolygonTool(),
                 new ObboxTool(),
+                new MaskColorTool(),
                 new MagicWandTool()),
             this.shapeToggles,
             this.shapeActions,
