@@ -16,6 +16,7 @@ import com.igormaznitsa.annotator.ui.icons.IconService;
 import com.igormaznitsa.annotator.ui.operations.DeleteTreeOperation;
 import com.igormaznitsa.annotator.ui.operations.EditTreeOperation;
 import com.igormaznitsa.annotator.ui.operations.ExportTreeOperation;
+import com.igormaznitsa.annotator.ui.operations.RefreshTreeOperation;
 import com.igormaznitsa.annotator.ui.tools.AddVertexAction;
 import com.igormaznitsa.annotator.ui.tools.GridToggle;
 import com.igormaznitsa.annotator.ui.tools.LockSelectedToggle;
@@ -70,6 +71,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
   private final TreeOperationBar treeOperations = new TreeOperationBar(this.icons, List.of(
       new DeleteTreeOperation(),
       new EditTreeOperation(),
+      new RefreshTreeOperation(),
       new ExportTreeOperation()));
   private final List<com.igormaznitsa.annotator.ui.api.ImageViewAction> viewActions = List.of(
       new ZoomInAction(),
@@ -257,8 +259,8 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     this.editorTabs.setStateChangeListener(this::updateMenuItems);
     this.editorTabs.setRevealInTreeListener(path -> this.fileTree.reveal(path));
     this.editorTabs.setSessionClosedListener(this.workspace::close);
+    this.fileTree.setFileOpenListener(this::openPath);
     this.fileTree.addSelectionListener(event -> this.treeOperations.refreshState(this));
-    this.fileTree.addSelectionListener(event -> this.openSelectedImages());
   }
 
   private void registerExitConfirmation() {
@@ -339,11 +341,24 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     chooser.setDialogTitle("Open folder");
     if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
       try {
-        this.fileTree.openFolder(chooser.getSelectedFile().toPath());
+        this.fileTree.openFolder(this.selectedFolder(chooser));
+        this.treeOperations.refreshState(this);
       } catch (final IOException exception) {
         this.showError(exception.getMessage());
       }
     }
+  }
+
+  private Path selectedFolder(final JFileChooser chooser) {
+    final Path selected = chooser.getSelectedFile().toPath();
+    final Path current = chooser.getCurrentDirectory().toPath();
+    if (Files.isDirectory(current)
+        && !Files.isDirectory(selected)
+        && current.getFileName() != null
+        && current.getFileName().equals(selected.getFileName())) {
+      return current;
+    }
+    return selected;
   }
 
   private void chooseFile() {
@@ -351,17 +366,6 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     chooser.setFileFilter(new FileNameExtensionFilter("PNG images", "png"));
     if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
       this.openPath(chooser.getSelectedFile().toPath());
-    }
-  }
-
-  private void openSelectedImages() {
-    if (!this.fileTree.hasOpenFolder()) {
-      return;
-    }
-    for (final Path path : this.selectedPaths()) {
-      if (Files.isRegularFile(path) && AllowedImageFiles.isAllowed(path)) {
-        this.openPath(path);
-      }
     }
   }
 

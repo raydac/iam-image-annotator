@@ -173,7 +173,11 @@ public final class AnnotatedPng {
 
   public void write(final OutputStream output) throws IOException {
     final AnnotationOverlayRenderer renderer = new AnnotationOverlayRenderer();
-    final BufferedImage composed = renderer.compose(this.baseImage, this.document);
+    final PngDisplayRasterOptimizer optimizer = new PngDisplayRasterOptimizer();
+    final BufferedImage displayBase =
+        optimizer.optimizeBaseForFilledAnnotations(this.baseImage, this.document);
+    final BufferedImage composed =
+        optimizer.optimizeEncodedDisplayRaster(renderer.compose(displayBase, this.document));
     final PngChunkIO chunkIo = new PngChunkIO();
 
     final byte[] ibse = encodePng(this.baseImage);

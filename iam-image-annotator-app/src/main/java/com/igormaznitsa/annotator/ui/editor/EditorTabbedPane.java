@@ -7,7 +7,6 @@ import java.awt.FlowLayout;
 import java.awt.Frame;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -159,18 +158,9 @@ public final class EditorTabbedPane extends JTabbedPane {
           this,
           "Discard unsaved changes?",
           "Unsaved changes",
-          JOptionPane.YES_NO_CANCEL_OPTION);
-      if (choice == JOptionPane.CANCEL_OPTION) {
+          JOptionPane.OK_CANCEL_OPTION);
+      if (choice != JOptionPane.OK_OPTION) {
         return false;
-      }
-      if (choice == JOptionPane.YES_OPTION) {
-        try {
-          canvas.session().save(path);
-        } catch (final IOException exception) {
-          JOptionPane.showMessageDialog(this, exception.getMessage(), "Save failed",
-              JOptionPane.ERROR_MESSAGE);
-          return false;
-        }
       }
     }
     for (int i = 0; i < this.getTabCount(); i++) {

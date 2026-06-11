@@ -54,6 +54,11 @@ public final class SelectTool extends AbstractMouseEditTool {
   }
 
   @Override
+  protected boolean clearsSelectionOnActivate() {
+    return false;
+  }
+
+  @Override
   protected MouseToolAdapter createMouseAdapter() {
     return new MouseToolAdapter() {
       @Override

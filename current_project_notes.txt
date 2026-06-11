@@ -9,20 +9,28 @@
 - 2026-05-30: Saved annotated PNGs now request maximum PNG compression for both display raster and embedded base image.
 - 2026-05-30: Extracted reusable `ProgressGlassPane` with optional operation-stage text for long UI tasks.
 - 2026-05-30: Optimized image open path: annotation detection skips PNG payloads and plain PNGs decode directly via ImageIO.
+- 2026-06-11: Fixed folder chooser duplicate-name selection after double-click navigation and added a root-folder refresh toolbar action that preserves tree expansion/selection while reflecting disk changes.
+- 2026-06-11: Reduced annotated PNG size by posterizing only the visible preview raster under filled annotation regions; embedded original image data remains lossless.
+- 2026-06-11: Switching from selection to a region-creation mouse tool now clears the selected region so stale edit handles disappear.
+- 2026-06-11: Layer stack dialog row focus now selects the corresponding visible annotation on the image.
+- 2026-06-11: Image editor canvas now centers smaller images and paints a checkerboard background around them to show image boundaries.
+- 2026-06-11: File tree opens images only on explicit activation (double-click or Enter), including already-selected closed rows; dirty tab close dialog uses OK/Cancel only.
 
 ## 2. Architecture & Technical Discoveries
 - Java 21 Maven project; use `mvn22` for builds and tests.
 - Main app module is `iam-image-annotator-app`; Windows launcher is only included by the `publish` Maven profile.
 - PNG annotation persistence is handled through custom PNG chunks and JSON serialization.
+- Visible annotated PNG IDAT is allowed to be lossy for compression, but `iBSE` must preserve the original base image.
 - Annotation JSON supports `visible`; missing values default to visible for backward compatibility.
 - Magic wand flood-fill masks are converted to polygon annotations in `MagicWandMaskContour`; border-edge tracing is used to avoid cycles from irregular boundary-pixel ordering.
 - `MainFrame` runs long open/save tasks through a `SwingWorker` plus reusable `ProgressGlassPane`; existing-open tabs are selected immediately.
+- `FileTreePanel.refresh()` rebuilds from disk while restoring expanded folder paths and still-existing selections.
 
 ## 3. Technical Debt & Refactoring
 - Some Swing UI methods return `null` internally for optional UI state; consider tightening to `Optional` where it improves call-site clarity.
 
 ## 4. Current Work In Progress
-- Slow PNG open glass-pane progress and magic-wand seed fallback fixes completed; `mvn22 test` passes.
+- Enter-to-open selected tree image completed; `mvn22 -pl iam-image-annotator-app test` passes.
 
 ## 5. Known Issues & Limitations
 - No changelog file is present in the project root.

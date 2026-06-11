@@ -44,6 +44,11 @@ public final class LayerOrderDialog extends JDialog {
     this.reload();
     this.list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
     this.list.setCellRenderer(new LayerCellRenderer());
+    this.list.addListSelectionListener(event -> {
+      if (!event.getValueIsAdjusting()) {
+        this.selectFocusedLayerOnCanvas();
+      }
+    });
     this.list.addMouseListener(new MouseAdapter() {
       @Override
       public void mouseClicked(final MouseEvent event) {
@@ -90,7 +95,20 @@ public final class LayerOrderDialog extends JDialog {
 
   private String selectedName() {
     final AnnotationEntry entry = this.list.getSelectedValue();
-    return entry == null ? null : entry.id();
+    return entry == null ? this.context.selectedAnnotation().orElse(null) : entry.id();
+  }
+
+  private void selectFocusedLayerOnCanvas() {
+    final AnnotationEntry entry = this.list.getSelectedValue();
+    if (entry == null) {
+      return;
+    }
+    if (entry.visible()) {
+      this.context.selectAnnotation(entry.id());
+    } else if (this.context.selectedAnnotation().filter(entry.id()::equals).isPresent()) {
+      this.context.clearSelection();
+    }
+    this.context.repaintCanvas();
   }
 
   private void toggleVisibilityAt(final MouseEvent event) {

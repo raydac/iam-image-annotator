@@ -13,6 +13,7 @@ import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
@@ -29,13 +30,19 @@ import javax.swing.AbstractAction;
 import javax.swing.JComponent;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JViewport;
 import javax.swing.KeyStroke;
 import javax.swing.RepaintManager;
+import javax.swing.Scrollable;
 import javax.swing.SwingUtilities;
 
-public final class ImageCanvas extends JPanel implements EditorPanelContext {
+public final class ImageCanvas extends JPanel implements EditorPanelContext, Scrollable {
 
   private static final int GRID_STEP = 32;
+  private static final int CHECKER_SIZE = 16;
+  private static final Color CHECKER_LIGHT = new Color(88, 88, 88);
+  private static final Color CHECKER_DARK = new Color(64, 64, 64);
+  private static final Color IMAGE_BORDER = new Color(235, 235, 235, 180);
   private static final java.awt.Color SELECTION_GREEN = new java.awt.Color(80, 230, 90);
   private static final java.awt.Color SELECTION_GREEN_DARK = new java.awt.Color(0, 150, 40);
   private static final java.awt.Color LOCKED_HANDLE = new java.awt.Color(160, 160, 160);
@@ -226,16 +233,18 @@ public final class ImageCanvas extends JPanel implements EditorPanelContext {
 
   @Override
   public Point imagePointFromScreen(final Point screenPoint) {
+    final Point origin = this.imageOrigin();
     return new Point(
-        (int) Math.round(screenPoint.x / this.zoom),
-        (int) Math.round(screenPoint.y / this.zoom));
+        (int) Math.round((screenPoint.x - origin.x) / this.zoom),
+        (int) Math.round((screenPoint.y - origin.y) / this.zoom));
   }
 
   @Override
   public Point screenPointFromImage(final double normX, final double normY) {
+    final Point origin = this.imageOrigin();
     return new Point(
-        (int) Math.round(normX * this.image().getWidth() * this.zoom),
-        (int) Math.round(normY * this.image().getHeight() * this.zoom));
+        origin.x + (int) Math.round(normX * this.image().getWidth() * this.zoom),
+        origin.y + (int) Math.round(normY * this.image().getHeight() * this.zoom));
   }
 
   @Override
@@ -265,9 +274,12 @@ public final class ImageCanvas extends JPanel implements EditorPanelContext {
   protected void paintComponent(final Graphics graphics) {
     super.paintComponent(graphics);
     final Graphics2D g2 = (Graphics2D) graphics.create();
+    this.paintCheckerboard(g2);
+    final Point imageOrigin = this.imageOrigin();
     g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
         RenderingHints.VALUE_INTERPOLATION_BILINEAR);
     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+    g2.translate(imageOrigin.x, imageOrigin.y);
     g2.scale(this.zoom, this.zoom);
     g2.drawImage(this.image(), 0, 0, null);
     if (this.gridVisible) {
@@ -295,7 +307,27 @@ public final class ImageCanvas extends JPanel implements EditorPanelContext {
         .flatMap(name -> this.session.document().findById(name))
         .filter(AnnotationEntry::visible)
         .ifPresent(entry -> this.paintSelectionHandles(g2, imageWidth, imageHeight, entry));
+    this.paintImageBorder(g2, imageWidth, imageHeight);
     g2.dispose();
+  }
+
+  private void paintCheckerboard(final Graphics2D graphics) {
+    for (int y = 0; y < this.getHeight(); y += CHECKER_SIZE) {
+      for (int x = 0; x < this.getWidth(); x += CHECKER_SIZE) {
+        final boolean light = ((x / CHECKER_SIZE) + (y / CHECKER_SIZE)) % 2 == 0;
+        graphics.setColor(light ? CHECKER_LIGHT : CHECKER_DARK);
+        graphics.fillRect(x, y, CHECKER_SIZE, CHECKER_SIZE);
+      }
+    }
+  }
+
+  private void paintImageBorder(
+      final Graphics2D graphics,
+      final int imageWidth,
+      final int imageHeight) {
+    graphics.setColor(IMAGE_BORDER);
+    graphics.setStroke(new BasicStroke((float) Math.max(1.0, 1.0 / this.zoom)));
+    graphics.drawRect(0, 0, imageWidth - 1, imageHeight - 1);
   }
 
   private void paintSelectionHandles(
@@ -668,10 +700,63 @@ public final class ImageCanvas extends JPanel implements EditorPanelContext {
   }
 
   private void recomputePreferredSize() {
-    final Dimension size = new Dimension(
+    this.setPreferredSize(this.imageDisplaySize());
+    this.revalidate();
+  }
+
+  private Dimension imageDisplaySize() {
+    return new Dimension(
         (int) Math.round(this.image().getWidth() * this.zoom),
         (int) Math.round(this.image().getHeight() * this.zoom));
-    this.setPreferredSize(size);
-    this.revalidate();
+  }
+
+  private Point imageOrigin() {
+    final Dimension size = this.imageDisplaySize();
+    return new Point(
+        Math.max(0, (this.getWidth() - size.width) / 2),
+        Math.max(0, (this.getHeight() - size.height) / 2));
+  }
+
+  @Override
+  public Dimension getPreferredScrollableViewportSize() {
+    return this.getPreferredSize();
+  }
+
+  @Override
+  public int getScrollableUnitIncrement(
+      final Rectangle visibleRect,
+      final int orientation,
+      final int direction) {
+    return CHECKER_SIZE;
+  }
+
+  @Override
+  public int getScrollableBlockIncrement(
+      final Rectangle visibleRect,
+      final int orientation,
+      final int direction) {
+    return Math.max(CHECKER_SIZE, (orientation == SwingUtilities.VERTICAL
+        ? visibleRect.height
+        : visibleRect.width) - CHECKER_SIZE);
+  }
+
+  @Override
+  public boolean getScrollableTracksViewportWidth() {
+    return this.isViewportWiderThanImage();
+  }
+
+  @Override
+  public boolean getScrollableTracksViewportHeight() {
+    return this.isViewportTallerThanImage();
+  }
+
+  private boolean isViewportWiderThanImage() {
+    return this.getParent() instanceof JViewport viewport
+        && viewport.getExtentSize().width > this.imageDisplaySize().width;
+  }
+
+  private boolean isViewportTallerThanImage() {
+    return this.getParent() instanceof JViewport viewport
+        && viewport.getExtentSize().height > this.imageDisplaySize().height;
   }
 }

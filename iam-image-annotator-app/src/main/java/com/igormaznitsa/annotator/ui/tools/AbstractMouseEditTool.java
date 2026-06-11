@@ -18,6 +18,10 @@ public abstract class AbstractMouseEditTool implements EditImageTool {
 
   @Override
   public void activate(final EditorPanelContext context) {
+    if (this.clearsSelectionOnActivate() && context.selectedAnnotation().isPresent()) {
+      context.clearSelection();
+      context.repaintCanvas();
+    }
     this.mouseAdapter.activate(context);
     if (context instanceof ImageCanvas canvas) {
       canvas.setActiveMouseTool(this.mouseAdapter);
@@ -53,5 +57,9 @@ public abstract class AbstractMouseEditTool implements EditImageTool {
   }
 
   protected void clearDrawingState(final EditorPanelContext context) {
+  }
+
+  protected boolean clearsSelectionOnActivate() {
+    return true;
   }
 }
