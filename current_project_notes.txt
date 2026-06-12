@@ -21,18 +21,22 @@
 - 2026-06-11: Editor toolbar now includes a mask color tool; toggle it, then double-click a mask to open a class-titled Swing color chooser and update annotation fill with undo support.
 - 2026-06-11: Mask/fill color chooser now shows Look & Feel-safe quick pure-color icon swatches above the standard Swing chooser for faster annotation color selection.
 - 2026-06-12: Added File > Export as... with annotated-image exporter filters and first implementation for YOLO bounding-box train/val datasets; menu enables for selected tree folders and exports all allowed PNGs recursively.
+- 2026-06-12: YOLO bounding export now shows a scrollable "Confirm detected classes" dialog after class detection; Cancel aborts before dataset files are written.
+- 2026-06-12: JPEG/JPG files can be opened as editable source images; Save and Save As always write annotated output as PNG.
+- 2026-06-12: Renaming an annotation label now preserves its existing fill/mask color; color changes are handled only by the dedicated color tools/dialogs.
 
 ## 2. Architecture & Technical Discoveries
 - Java 21 Maven project; use `mvn22` for builds and tests.
 - Main app module is `iam-image-annotator-app`; Windows launcher is only included by the `publish` Maven profile.
 - PNG annotation persistence is handled through custom PNG chunks and JSON serialization.
+- JPEG/JPG files are input-only for editing; annotations are persisted by saving to the same stem with `.png`.
 - Visible annotated PNG IDAT is allowed to be lossy for compression, but `iBSE` must preserve the original base image.
 - Annotation JSON supports `visible`; missing values default to visible for backward compatibility.
 - Magic wand flood-fill masks are converted to polygon annotations in `MagicWandMaskContour`; border-edge tracing is used to avoid cycles from irregular boundary-pixel ordering.
 - `MainFrame` runs long open/save tasks through a `SwingWorker` plus reusable `ProgressGlassPane`; existing-open tabs are selected immediately.
 - `FileTreePanel.refresh()` rebuilds from disk while restoring expanded folder paths and still-existing selections.
 - Annotated-image exporter API lives in `exporters.api`; shared exporter helpers live in `exporters.common`; each concrete exporter keeps its implementation classes in its own `exporters.<name>` subpackage.
-- YOLO bounding exporter skips plain/unannotated PNGs, exports visible annotations as bounding boxes, writes base images from `iBSE` as JPEG quality 95, and uses `YoloDatasetSplitter` to keep similar images in the same train/val split.
+- YOLO bounding exporter skips plain/unannotated PNGs, writes Ultralytics layout `images/train`, `images/val`, `labels/train`, `labels/val`, exports visible annotations as bounding boxes, writes base images from `iBSE` as JPEG quality 95, writes `data.yaml`, and uses `YoloDatasetSplitter` to keep similar images in the same train/val split.
 
 ## 3. Technical Debt & Refactoring
 - Some Swing UI methods return `null` internally for optional UI state; consider tightening to `Optional` where it improves call-site clarity.

@@ -20,12 +20,28 @@ class AllowedImageFilesTest {
   }
 
   @Test
+  void allowsJpegFiles() throws IOException {
+    assertTrue(AllowedImageFiles.isAllowed(Files.createFile(tempDir.resolve("photo.jpg"))));
+    assertTrue(AllowedImageFiles.isAllowed(Files.createFile(tempDir.resolve("photo.jpeg"))));
+  }
+
+  @Test
   void rejectsCompoundExtensionPng() throws IOException {
     assertFalse(AllowedImageFiles.isAllowed(Files.createFile(tempDir.resolve("photo.extra.png"))));
   }
 
   @Test
-  void rejectsNonPngFiles() throws IOException {
-    assertFalse(AllowedImageFiles.isAllowed(Files.createFile(tempDir.resolve("photo.jpg"))));
+  void rejectsNonImageFiles() throws IOException {
+    assertFalse(AllowedImageFiles.isAllowed(Files.createFile(tempDir.resolve("photo.gif"))));
+  }
+
+  @Test
+  void resolvesAnnotatedPngPath() {
+    assertTrue(AllowedImageFiles.toAnnotatedPngPath(tempDir.resolve("photo.jpg"))
+        .endsWith("photo.png"));
+    assertTrue(AllowedImageFiles.toAnnotatedPngPath(tempDir.resolve("photo.jpeg"))
+        .endsWith("photo.png"));
+    assertTrue(AllowedImageFiles.toAnnotatedPngPath(tempDir.resolve("photo.png"))
+        .endsWith("photo.png"));
   }
 }

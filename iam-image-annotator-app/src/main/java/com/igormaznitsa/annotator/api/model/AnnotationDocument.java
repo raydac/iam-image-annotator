@@ -132,8 +132,7 @@ public final class AnnotationDocument {
     final int index = this.requireIndex(oldId);
     this.requireUnlocked(this.entries.get(index));
     final AnnotationEntry current = this.entries.get(index);
-    this.entries.set(index,
-        current.withId(normalized).withFillColor(ClassNames.autoColor(normalized)));
+    this.entries.set(index, current.withId(normalized));
   }
 
   private void requireUniqueId(final String id) {

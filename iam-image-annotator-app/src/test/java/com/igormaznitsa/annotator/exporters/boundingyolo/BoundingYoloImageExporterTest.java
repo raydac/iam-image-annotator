@@ -17,6 +17,8 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CancellationException;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -33,20 +35,52 @@ class BoundingYoloImageExporterTest {
     final Path dataset = this.tempDir.resolve("dataset");
     ImageIO.write(this.solidImage(Color.GREEN), "png", plain.toFile());
     this.writeAnnotatedImage(annotated);
+    final boolean[] confirmed = {false};
 
-    new BoundingYoloImageExporter(5).exportImages(List.of(plain, annotated), dataset, ignored -> {
+    new BoundingYoloImageExporter(5, classIds -> {
+      confirmed[0] = true;
+      assertEquals(Map.of("vehicle", 5), classIds);
+      return true;
+    }).exportImages(List.of(plain, annotated), dataset, ignored -> {
     });
 
-    assertFalse(Files.exists(dataset.resolve("train").resolve("images").resolve("plain.jpg")));
-    assertFalse(Files.exists(dataset.resolve("train").resolve("images").resolve("annotated.png")));
-    assertTrue(Files.exists(dataset.resolve("train").resolve("images").resolve("annotated.jpg")));
+    assertTrue(confirmed[0]);
+    assertFalse(Files.exists(dataset.resolve("images").resolve("train").resolve("plain.jpg")));
+    assertFalse(Files.exists(dataset.resolve("images").resolve("train").resolve("annotated.png")));
+    assertTrue(Files.exists(dataset.resolve("images").resolve("train").resolve("annotated.jpg")));
     assertEquals(
         List.of("5 0.500000 0.500000 0.500000 0.500000"),
-        Files.readAllLines(dataset.resolve("train").resolve("labels").resolve("annotated.txt")));
+        Files.readAllLines(dataset.resolve("labels").resolve("train").resolve("annotated.txt")));
+    assertEquals(
+        List.of(
+            "path: .",
+            "train: images/train",
+            "val: images/val",
+            "",
+            "names:",
+            "  5: vehicle"),
+        Files.readAllLines(dataset.resolve("data.yaml")));
     final BufferedImage exported =
-        ImageIO.read(dataset.resolve("train").resolve("images").resolve("annotated.jpg").toFile());
+        ImageIO.read(dataset.resolve("images").resolve("train").resolve("annotated.jpg").toFile());
     assertEquals(32, exported.getWidth());
     assertEquals(32, exported.getHeight());
+  }
+
+  @Test
+  void cancelingClassConfirmationStopsExport() throws IOException {
+    final Path annotated = this.tempDir.resolve("cancel.png");
+    final Path dataset = this.tempDir.resolve("cancel-dataset");
+    this.writeAnnotatedImage(annotated);
+
+    org.junit.jupiter.api.Assertions.assertThrows(
+        CancellationException.class,
+        () -> new BoundingYoloImageExporter(0, ignored -> false)
+            .exportImages(List.of(annotated), dataset, ignored -> {
+            }));
+
+    assertFalse(Files.exists(dataset.resolve("data.yaml")));
+    assertFalse(Files.exists(dataset.resolve("images")));
+    assertFalse(Files.exists(dataset.resolve("labels")));
   }
 
   private void writeAnnotatedImage(final Path path) throws IOException {

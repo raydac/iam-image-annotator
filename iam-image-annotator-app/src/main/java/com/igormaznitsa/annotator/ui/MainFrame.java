@@ -42,14 +42,18 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -64,8 +68,11 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JRootPane;
+import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
+import javax.swing.JTextArea;
 import javax.swing.KeyStroke;
+import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.filechooser.FileFilter;
 import javax.swing.filechooser.FileNameExtensionFilter;
@@ -384,7 +391,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
 
   private void chooseFile() {
     final JFileChooser chooser = new JFileChooser();
-    chooser.setFileFilter(new FileNameExtensionFilter("PNG images", "png"));
+    chooser.setFileFilter(new FileNameExtensionFilter("Images", "png", "jpg", "jpeg"));
     if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
       this.openPath(chooser.getSelectedFile().toPath());
     }
@@ -393,7 +400,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
   private void exportAs() {
     final List<Path> imageFiles = this.selectedExportableImages();
     if (imageFiles.isEmpty()) {
-      this.showError("Select one or more PNG images or folders to export.");
+      this.showError("Select one or more images or folders to export.");
       return;
     }
 
@@ -474,11 +481,55 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
         return Optional.empty();
       }
       try {
-        return Optional.of(new BoundingYoloImageExporter(Integer.parseInt(value.strip())));
+        return Optional.of(new BoundingYoloImageExporter(
+            Integer.parseInt(value.strip()),
+            this::confirmDetectedClasses));
       } catch (final IllegalArgumentException exception) {
         this.showError("Class id must be a non-negative integer.");
       }
     }
+  }
+
+  private boolean confirmDetectedClasses(final Map<String, Integer> classIds) {
+    if (SwingUtilities.isEventDispatchThread()) {
+      return this.showDetectedClassesDialog(classIds);
+    }
+    final boolean[] confirmed = {false};
+    try {
+      SwingUtilities.invokeAndWait(() -> confirmed[0] = this.showDetectedClassesDialog(classIds));
+      return confirmed[0];
+    } catch (final InterruptedException exception) {
+      Thread.currentThread().interrupt();
+      return false;
+    } catch (final InvocationTargetException exception) {
+      throw new IllegalStateException("Unable to confirm detected classes", exception.getCause());
+    }
+  }
+
+  private boolean showDetectedClassesDialog(final Map<String, Integer> classIds) {
+    final JTextArea classes = new JTextArea(this.formatDetectedClasses(classIds), 12, 36);
+    classes.setEditable(false);
+    classes.setCaretPosition(0);
+    final int choice = JOptionPane.showConfirmDialog(
+        this,
+        new JScrollPane(classes),
+        "Confirm detected classes",
+        JOptionPane.OK_CANCEL_OPTION,
+        JOptionPane.QUESTION_MESSAGE);
+    return choice == JOptionPane.OK_OPTION;
+  }
+
+  private String formatDetectedClasses(final Map<String, Integer> classIds) {
+    final StringBuilder builder = new StringBuilder();
+    classIds.entrySet().stream()
+        .sorted(Map.Entry.comparingByValue())
+        .forEach(entry -> {
+          if (!builder.isEmpty()) {
+            builder.append('\n');
+          }
+          builder.append(entry.getValue()).append(": ").append(entry.getKey());
+        });
+    return builder.toString();
   }
 
   private void exportImagesWithProgress(
@@ -528,6 +579,10 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
       this.showError("Export interrupted: " + exception.getMessage());
     } catch (final ExecutionException exception) {
       this.hideProgressOverlay();
+      if (exception.getCause() instanceof CancellationException) {
+        this.statusLabel.setText("Export cancelled");
+        return;
+      }
       this.showError("Export failed: " + this.toException(exception.getCause()).getMessage());
     }
   }
@@ -572,12 +627,12 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     if (!AllowedImageFiles.isAllowed(path)) {
       throw new IOException("Unsupported file: " + path);
     }
-    if (AnnotatedPng.hasAnnotationChunks(path)) {
+    if (AllowedImageFiles.isPng(path) && AnnotatedPng.hasAnnotationChunks(path)) {
       return EditorSession.open(path);
     }
     final BufferedImage image = ImageIO.read(path.toFile());
     if (image == null) {
-      throw new IOException("Unable to decode PNG image: " + path);
+      throw new IOException("Unable to decode image: " + path);
     }
     return EditorSession.fromImage(path, image);
   }
@@ -634,8 +689,11 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     }
   }
 
-  private void saveSessionToTarget(final EditorSession session) throws IOException {
-    session.save(session.filePath());
+  private SaveResult saveSessionToTarget(final EditorSession session) throws IOException {
+    final Path source = session.filePath();
+    final Path target = AllowedImageFiles.toAnnotatedPngPath(source);
+    session.save(target);
+    return new SaveResult(source, target, session);
   }
 
   private void saveActive() {
@@ -644,14 +702,12 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
       return;
     }
     final EditorSession session = canvas.session();
-    this.statusLabel.setText("Saving " + session.filePath().getFileName() + "...");
+    final Path target = AllowedImageFiles.toAnnotatedPngPath(session.filePath());
+    this.statusLabel.setText("Saving " + target.getFileName() + "...");
     this.runWithProgress(
-        "Saving " + session.filePath().getFileName() + "...",
-        () -> {
-          this.saveSessionToTarget(session);
-          return session;
-        },
-        saved -> this.afterSave("Saved " + saved.filePath().getFileName()),
+        "Saving " + target.getFileName() + "...",
+        () -> this.saveSessionToTarget(session),
+        saved -> this.afterSave(saved, "Saved " + saved.target().getFileName()),
         exception -> this.showError("Save failed: " + exception.getMessage()));
   }
 
@@ -661,22 +717,23 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
       return;
     }
     final JFileChooser chooser = new JFileChooser();
-    chooser.setSelectedFile(canvas.session().filePath().toFile());
+    chooser.setSelectedFile(
+        AllowedImageFiles.toAnnotatedPngPath(canvas.session().filePath()).toFile());
     chooser.setFileFilter(new FileNameExtensionFilter("PNG images", "png"));
     if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
       return;
     }
     final EditorSession session = canvas.session();
     final Path source = session.filePath();
-    final Path target = chooser.getSelectedFile().toPath();
+    final Path target = AllowedImageFiles.toAnnotatedPngPath(chooser.getSelectedFile().toPath());
     this.statusLabel.setText("Saving " + target.getFileName() + "...");
     this.runWithProgress(
         "Saving " + target.getFileName() + "...",
         () -> {
           session.save(target);
-          return new SaveAsResult(source, target, session);
+          return new SaveResult(source, target, session);
         },
-        this::afterSaveAs,
+        saved -> this.afterSave(saved, "Saved " + saved.target().getFileName()),
         exception -> this.showError("Save failed: " + exception.getMessage()));
   }
 
@@ -695,16 +752,27 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     this.runWithProgress(
         "Saving " + dirtySessions.size() + " file(s)...",
         () -> {
+          final List<SaveResult> results = new ArrayList<>();
           for (final EditorSession session : dirtySessions) {
-            this.saveSessionToTarget(session);
+            results.add(this.saveSessionToTarget(session));
           }
-          return dirtySessions.size();
+          return List.copyOf(results);
         },
-        count -> {
-          this.afterSave("Saved " + count + " file(s)");
+        results -> {
+          this.afterSave(results, "Saved " + results.size() + " file(s)");
           onSuccess.run();
         },
         exception -> this.showError("Save failed: " + exception.getMessage()));
+  }
+
+  private void afterSave(final List<SaveResult> results, final String statusText) {
+    results.forEach(this::rekeySavedSession);
+    this.afterSave(statusText);
+  }
+
+  private void afterSave(final SaveResult result, final String statusText) {
+    this.rekeySavedSession(result);
+    this.afterSave(statusText);
   }
 
   private void afterSave(final String statusText) {
@@ -713,12 +781,13 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     this.onEditorStateChanged();
   }
 
-  private void afterSaveAs(final SaveAsResult result) {
+  private void rekeySavedSession(final SaveResult result) {
+    if (result.source().equals(result.target())) {
+      return;
+    }
     this.workspace.close(result.source());
-    result.session().rekey(result.target());
     this.editorTabs.rekeySession(result.source(), result.target());
     this.workspace.open(result.session());
-    this.afterSave("Saved " + result.target().getFileName());
   }
 
   private void onEditorStateChanged() {
@@ -779,6 +848,6 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     this.showJsonItem.setEnabled(hasActiveEditor);
   }
 
-  private record SaveAsResult(Path source, Path target, EditorSession session) {
+  private record SaveResult(Path source, Path target, EditorSession session) {
   }
 }

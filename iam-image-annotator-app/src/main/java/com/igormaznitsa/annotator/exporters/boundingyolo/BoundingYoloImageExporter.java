@@ -29,7 +29,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.CancellationException;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
@@ -51,12 +53,20 @@ public final class BoundingYoloImageExporter implements AnnotatedImagesExporter 
   private final FileFilter fileFilter = new ExporterDirectoryFileFilter(TITLE);
   private final ImagePerceptualHash perceptualHash = new ImagePerceptualHash();
   private final YoloDatasetSplitter splitter = new YoloDatasetSplitter();
+  private final Predicate<Map<String, Integer>> classConfirmation;
 
   public BoundingYoloImageExporter(final int firstClassId) {
+    this(firstClassId, ignored -> true);
+  }
+
+  public BoundingYoloImageExporter(
+      final int firstClassId,
+      final Predicate<Map<String, Integer>> classConfirmation) {
     if (firstClassId < 0) {
       throw new IllegalArgumentException("firstClassId must be zero or greater");
     }
     this.firstClassId = firstClassId;
+    this.classConfirmation = requireNonNull(classConfirmation, "classConfirmation");
   }
 
   private static String labelFileNameFor(final String imageFileName) {
@@ -91,13 +101,17 @@ public final class BoundingYoloImageExporter implements AnnotatedImagesExporter 
 
     this.report(progressConsumer, "Building class map", SPLIT_PERCENT);
     final Map<String, Integer> classIds = this.buildClassIds(rawSamples);
+    this.report(progressConsumer, "Confirming detected classes", SPLIT_PERCENT);
+    if (!this.classConfirmation.test(classIds)) {
+      throw new CancellationException("Export cancelled by user");
+    }
     final List<YoloImageSample> samples = rawSamples.stream()
         .map(sample -> sample.toYoloSample(classIds))
         .toList();
 
     this.report(progressConsumer, "Splitting train and validation sets", SPLIT_PERCENT);
     final YoloDatasetSplit split = this.splitter.split(samples);
-    this.exportDataset(split, destinationFolder, progressConsumer);
+    this.exportDataset(split, classIds, destinationFolder, progressConsumer);
     this.report(progressConsumer, "YOLO dataset export complete", EXPORT_END_PERCENT);
   }
 
@@ -208,6 +222,7 @@ public final class BoundingYoloImageExporter implements AnnotatedImagesExporter 
 
   private void exportDataset(
       final YoloDatasetSplit split,
+      final Map<String, Integer> classIds,
       final Path destinationFolder,
       final Consumer<ExportProgress> progressConsumer) throws IOException {
     Files.createDirectories(destinationFolder);
@@ -215,28 +230,58 @@ public final class BoundingYoloImageExporter implements AnnotatedImagesExporter 
     this.prepareSplitFolders(destinationFolder, "val");
 
     final int total = split.train().size() + split.validation().size();
-    int exported = this.exportSplit(split.train(), destinationFolder.resolve("train"), 0, total,
+    int exported = this.exportSplit(split.train(), destinationFolder, "train", 0, total,
         progressConsumer);
-    this.exportSplit(split.validation(), destinationFolder.resolve("val"), exported, total,
+    this.exportSplit(split.validation(), destinationFolder, "val", exported, total,
         progressConsumer);
+    this.writeDataYaml(destinationFolder, classIds);
+  }
+
+  private void writeDataYaml(final Path destinationFolder, final Map<String, Integer> classIds)
+      throws IOException {
+    Files.write(
+        destinationFolder.resolve("data.yaml"),
+        this.dataYamlLines(classIds),
+        StandardCharsets.UTF_8);
+  }
+
+  private List<String> dataYamlLines(final Map<String, Integer> classIds) {
+    final List<String> lines = new ArrayList<>();
+    lines.add("path: .");
+    lines.add("train: images/train");
+    lines.add("val: images/val");
+    lines.add("");
+    lines.add("names:");
+    classIds.entrySet().stream()
+        .sorted(Map.Entry.comparingByValue())
+        .map(entry -> "  " + entry.getValue() + ": " + this.yamlScalar(entry.getKey()))
+        .forEach(lines::add);
+    return List.copyOf(lines);
+  }
+
+  private String yamlScalar(final String value) {
+    return value.matches("[A-Za-z0-9_-]+") ? value : "'" + value.replace("'", "''") + "'";
   }
 
   private void prepareSplitFolders(final Path destinationFolder, final String splitName)
       throws IOException {
-    Files.createDirectories(destinationFolder.resolve(splitName).resolve("images"));
-    Files.createDirectories(destinationFolder.resolve(splitName).resolve("labels"));
+    Files.createDirectories(destinationFolder.resolve("images").resolve(splitName));
+    Files.createDirectories(destinationFolder.resolve("labels").resolve(splitName));
   }
 
   private int exportSplit(
       final List<YoloImageSample> samples,
-      final Path splitFolder,
+      final Path destinationFolder,
+      final String splitName,
       final int alreadyExported,
       final int total,
       final Consumer<ExportProgress> progressConsumer) throws IOException {
+    final Path imageFolder = destinationFolder.resolve("images").resolve(splitName);
+    final Path labelFolder = destinationFolder.resolve("labels").resolve(splitName);
     final Map<String, Integer> fileNameCounts = new HashMap<>();
     for (int i = 0; i < samples.size(); i++) {
       final YoloImageSample sample = samples.get(i);
-      this.report(progressConsumer, "Writing " + splitFolder.getFileName() + " sample "
+      this.report(progressConsumer, "Writing " + splitName + " sample "
           + sample.imagePath().getFileName(), this.percent(alreadyExported + i, total,
           EXPORT_START_PERCENT, EXPORT_END_PERCENT));
       final String imageFileName = this.uniqueJpegFileName(
@@ -244,9 +289,9 @@ public final class BoundingYoloImageExporter implements AnnotatedImagesExporter 
           fileNameCounts);
       this.writeBaseImageAsJpeg(
           sample.imagePath(),
-          splitFolder.resolve("images").resolve(imageFileName));
+          imageFolder.resolve(imageFileName));
       Files.write(
-          splitFolder.resolve("labels").resolve(labelFileNameFor(imageFileName)),
+          labelFolder.resolve(labelFileNameFor(imageFileName)),
           sample.boxes().stream().map(YoloBoundingBox::toLabelLine).toList(),
           StandardCharsets.UTF_8);
     }
