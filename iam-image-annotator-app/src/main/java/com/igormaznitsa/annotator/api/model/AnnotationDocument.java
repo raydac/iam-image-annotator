@@ -42,7 +42,6 @@ public final class AnnotationDocument {
 
   public AnnotationEntry add(final AnnotationEntry entry) {
     Objects.requireNonNull(entry, "entry");
-    this.requireUniqueId(entry.id());
     this.entries.add(entry);
     return entry;
   }
@@ -62,29 +61,29 @@ public final class AnnotationDocument {
     return this.add(entry);
   }
 
-  public void updateCoords(final String id, final AnnotationCoords coords) {
-    final int index = this.requireIndex(id);
+  public void updateCoords(final String key, final AnnotationCoords coords) {
+    final int index = this.requireIndex(key);
     this.requireUnlocked(this.entries.get(index));
     this.entries.set(index, this.entries.get(index).withCoords(coords));
   }
 
-  public void updateAnnotation(final String id, final AnnotationType type,
+  public void updateAnnotation(final String key, final AnnotationType type,
                                final AnnotationCoords coords) {
-    final int index = this.requireIndex(id);
+    final int index = this.requireIndex(key);
     this.requireUnlocked(this.entries.get(index));
     final AnnotationEntry current = this.entries.get(index);
     this.entries.set(index, current.withType(type).withCoords(coords));
   }
 
-  public void updateFillColor(final String id, final String fillColorHex) {
-    final int index = this.requireIndex(id);
+  public void updateFillColor(final String key, final String fillColorHex) {
+    final int index = this.requireIndex(key);
     this.requireUnlocked(this.entries.get(index));
     this.entries.set(index, this.entries.get(index)
         .withFillColor(ClassNames.normalizeColor(fillColorHex)));
   }
 
-  public void setLocked(final String id, final boolean locked) {
-    final int index = this.requireIndex(id);
+  public void setLocked(final String key, final boolean locked) {
+    final int index = this.requireIndex(key);
     final AnnotationEntry current = this.entries.get(index);
     if (current.locked() == locked) {
       return;
@@ -92,8 +91,8 @@ public final class AnnotationDocument {
     this.entries.set(index, current.withLocked(locked));
   }
 
-  public void setVisible(final String id, final boolean visible) {
-    final int index = this.requireIndex(id);
+  public void setVisible(final String key, final boolean visible) {
+    final int index = this.requireIndex(key);
     final AnnotationEntry current = this.entries.get(index);
     if (current.visible() == visible) {
       return;
@@ -101,59 +100,52 @@ public final class AnnotationDocument {
     this.entries.set(index, current.withVisible(visible));
   }
 
-  public void remove(final String id) {
-    this.entries.removeIf(entry -> entry.id().equals(id));
+  public void remove(final String key) {
+    this.entries.removeIf(entry -> entry.key().equals(key));
   }
 
-  public Optional<AnnotationEntry> findById(final String id) {
-    return this.entries.stream().filter(entry -> entry.id().equals(id)).findFirst();
+  public Optional<AnnotationEntry> findByKey(final String key) {
+    return this.entries.stream().filter(entry -> entry.key().equals(key)).findFirst();
   }
 
-  public void moveUp(final String id) {
-    final int index = this.indexOf(id);
+  public void moveUp(final String key) {
+    final int index = this.indexOf(key);
     if (index > 0) {
       Collections.swap(this.entries, index, index - 1);
     }
   }
 
-  public void moveDown(final String id) {
-    final int index = this.indexOf(id);
+  public void moveDown(final String key) {
+    final int index = this.indexOf(key);
     if (index >= 0 && index < this.entries.size() - 1) {
       Collections.swap(this.entries, index, index + 1);
     }
   }
 
-  public void rename(final String oldId, final String newId) {
-    if (oldId.equals(newId)) {
+  public void rename(final String key, final String newId) {
+    final String normalized = ClassNames.normalize(newId);
+    final int index = this.requireIndex(key);
+    if (this.entries.get(index).id().equals(normalized)) {
       return;
     }
-    final String normalized = ClassNames.normalize(newId);
-    this.requireUniqueId(normalized);
-    final int index = this.requireIndex(oldId);
     this.requireUnlocked(this.entries.get(index));
     final AnnotationEntry current = this.entries.get(index);
     this.entries.set(index, current.withId(normalized));
   }
 
-  private void requireUniqueId(final String id) {
-    if (this.findById(id).isPresent()) {
-      throw new IllegalArgumentException("Annotation label already exists: " + id);
-    }
-  }
-
-  private int indexOf(final String id) {
+  private int indexOf(final String key) {
     for (int i = 0; i < this.entries.size(); i++) {
-      if (this.entries.get(i).id().equals(id)) {
+      if (this.entries.get(i).key().equals(key)) {
         return i;
       }
     }
     return -1;
   }
 
-  private int requireIndex(final String id) {
-    final int index = this.indexOf(id);
+  private int requireIndex(final String key) {
+    final int index = this.indexOf(key);
     if (index < 0) {
-      throw new IllegalArgumentException("Unknown annotation: " + id);
+      throw new IllegalArgumentException("Unknown annotation: " + key);
     }
     return index;
   }

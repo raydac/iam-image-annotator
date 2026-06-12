@@ -19,6 +19,7 @@ import java.util.Optional;
 public final class SelectTool extends AbstractMouseEditTool {
 
   private AnnotationHandle activeHandle;
+  private String dragStartLabel;
   private AnnotationType dragStartType;
   private AnnotationCoords dragStartCoords;
   private int dragImageWidth;
@@ -70,7 +71,7 @@ public final class SelectTool extends AbstractMouseEditTool {
         final double normY = Geometry.clamp01((double) imagePoint.y / height);
         SelectTool.this.resetDrag(context);
         final Optional<AnnotationEntry> selected = context.selectedAnnotation()
-            .flatMap(name -> context.session().document().findById(name));
+            .flatMap(key -> context.session().document().findByKey(key));
         if (selected.isPresent()) {
           final Optional<AnnotationHandle> handle = AnnotationSelectionEditor.hitHandle(
               selected.get(),
@@ -94,7 +95,7 @@ public final class SelectTool extends AbstractMouseEditTool {
             normY);
         if (hit.isPresent()) {
           context.selectAnnotation(hit.get());
-          context.session().document().findById(hit.get()).ifPresent(entry -> {
+          context.session().document().findByKey(hit.get()).ifPresent(entry -> {
             if (entry.locked()) {
               return;
             }
@@ -123,7 +124,7 @@ public final class SelectTool extends AbstractMouseEditTool {
         final int height = context.image().getHeight();
         final double normX = Geometry.clamp01((double) imagePoint.x / width);
         final double normY = Geometry.clamp01((double) imagePoint.y / height);
-        context.session().document().findById(SelectTool.this.activeHandle.annotationId())
+        context.session().document().findByKey(SelectTool.this.activeHandle.annotationKey())
             .ifPresent(entry -> {
               if (entry.locked()) {
                 return;
@@ -136,7 +137,7 @@ public final class SelectTool extends AbstractMouseEditTool {
                   height);
               try {
                 context.session().document().updateAnnotation(
-                    entry.id(),
+                    entry.key(),
                     result.type(),
                     result.coords());
               } catch (final IllegalStateException exception) {
@@ -153,8 +154,7 @@ public final class SelectTool extends AbstractMouseEditTool {
       public void mouseReleased(final EditorPanelContext context, final MouseEvent event) {
         if (SelectTool.this.moved) {
           context.markDirty();
-          context.updateStatus(
-              "Annotation updated: " + SelectTool.this.activeHandle.annotationId());
+          context.updateStatus("Annotation updated: " + SelectTool.this.dragStartLabel);
         }
         SelectTool.this.resetDrag(context);
         context.repaintCanvas();
@@ -171,7 +171,7 @@ public final class SelectTool extends AbstractMouseEditTool {
         final double normX = Geometry.clamp01((double) imagePoint.x / width);
         final double normY = Geometry.clamp01((double) imagePoint.y / height);
         context.selectedAnnotation()
-            .flatMap(name -> context.session().document().findById(name))
+            .flatMap(key -> context.session().document().findByKey(key))
             .ifPresent(entry -> {
               final Optional<AnnotationHandle> handle = AnnotationSelectionEditor.hitHandle(
                   entry,
@@ -198,6 +198,7 @@ public final class SelectTool extends AbstractMouseEditTool {
       final int imageHeight) {
     context.session().recordUndoCheckpoint();
     this.activeHandle = handle;
+    this.dragStartLabel = entry.id();
     this.dragStartType = entry.type();
     this.dragStartCoords = entry.coords();
     this.dragImageWidth = imageWidth;
@@ -285,6 +286,7 @@ public final class SelectTool extends AbstractMouseEditTool {
       canvas.clearRotationArmAngleRad();
     }
     this.activeHandle = null;
+    this.dragStartLabel = null;
     this.dragStartType = null;
     this.dragStartCoords = null;
     this.dragCentroid = null;

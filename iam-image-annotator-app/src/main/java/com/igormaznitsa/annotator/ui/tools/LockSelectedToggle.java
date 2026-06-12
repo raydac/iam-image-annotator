@@ -55,7 +55,7 @@ public final class LockSelectedToggle implements ImageViewToggle {
   public void setSelected(final EditorPanelContext context, final boolean selected) {
     this.selectedEntry(context).ifPresent(entry -> {
       context.session().recordUndoCheckpoint();
-      context.session().document().setLocked(entry.id(), selected);
+      context.session().document().setLocked(entry.key(), selected);
       if (selected) {
         context.session().clearVertexSelection();
       }
@@ -69,6 +69,6 @@ public final class LockSelectedToggle implements ImageViewToggle {
 
   private Optional<AnnotationEntry> selectedEntry(final EditorPanelContext context) {
     return context.selectedAnnotation()
-        .flatMap(name -> context.session().document().findById(name));
+        .flatMap(key -> context.session().document().findByKey(key));
   }
 }

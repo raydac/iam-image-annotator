@@ -44,7 +44,7 @@ public final class ShapeEditDialog {
     fillRow.add(chooseFill);
 
     final JPanel panel = new JPanel(new BorderLayout(8, 8));
-    panel.add(new JLabel("Label (unique per shape):"), BorderLayout.NORTH);
+    panel.add(new JLabel("Class label:"), BorderLayout.NORTH);
     panel.add(idField, BorderLayout.CENTER);
     panel.add(fillRow, BorderLayout.SOUTH);
     panel.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));

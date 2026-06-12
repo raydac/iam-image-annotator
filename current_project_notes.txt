@@ -24,6 +24,9 @@
 - 2026-06-12: YOLO bounding export now shows a scrollable "Confirm detected classes" dialog after class detection; Cancel aborts before dataset files are written.
 - 2026-06-12: JPEG/JPG files can be opened as editable source images; Save and Save As always write annotated output as PNG.
 - 2026-06-12: Renaming an annotation label now preserves its existing fill/mask color; color changes are handled only by the dedicated color tools/dialogs.
+- 2026-06-12: Annotation labels are class names and may repeat on the same image; editor operations target per-zone internal keys instead.
+- 2026-06-12: New shapes default to unique `class_N` labels; sticky reuse still applies for user-chosen names like `coin` when labeling multiple objects of the same class.
+- 2026-06-12: YOLO bounding export normalizes class names to `[a-z0-9_]+` by trimming, lowercasing, and replacing spaces/invalid runs with underscores.
 
 ## 2. Architecture & Technical Discoveries
 - Java 21 Maven project; use `mvn22` for builds and tests.
@@ -37,12 +40,14 @@
 - `FileTreePanel.refresh()` rebuilds from disk while restoring expanded folder paths and still-existing selections.
 - Annotated-image exporter API lives in `exporters.api`; shared exporter helpers live in `exporters.common`; each concrete exporter keeps its implementation classes in its own `exporters.<name>` subpackage.
 - YOLO bounding exporter skips plain/unannotated PNGs, writes Ultralytics layout `images/train`, `images/val`, `labels/train`, `labels/val`, exports visible annotations as bounding boxes, writes base images from `iBSE` as JPEG quality 95, writes `data.yaml`, and uses `YoloDatasetSplitter` to keep similar images in the same train/val split.
+- YOLO class IDs are built from normalized export class names; source annotation labels are not rewritten.
+- `AnnotationEntry.id()` is the exported class label and is not unique; use `AnnotationEntry.key()` for selection, mutation, layer ordering, locking, visibility, and UI hit-test identity.
 
 ## 3. Technical Debt & Refactoring
 - Some Swing UI methods return `null` internally for optional UI state; consider tightening to `Optional` where it improves call-site clarity.
 
 ## 4. Current Work In Progress
-- File > Export as... YOLO bounding dataset exporter added; `mvn22 -pl iam-image-annotator-app test` passes.
+- New-shape default labels use unique `class_N` series; duplicate class names remain allowed via rename.
 
 ## 5. Known Issues & Limitations
 - No changelog file is present in the project root.

@@ -83,19 +83,19 @@ public final class LayerOrderDialog extends JDialog {
   }
 
   private void reload() {
-    final String selectedName = this.selectedName();
+    final String selectedKey = this.selectedKey();
     this.model.clear();
     for (final AnnotationEntry entry : this.session.document().entries()) {
       this.model.addElement(entry);
-      if (entry.id().equals(selectedName)) {
+      if (entry.key().equals(selectedKey)) {
         this.list.setSelectedIndex(this.model.size() - 1);
       }
     }
   }
 
-  private String selectedName() {
+  private String selectedKey() {
     final AnnotationEntry entry = this.list.getSelectedValue();
-    return entry == null ? this.context.selectedAnnotation().orElse(null) : entry.id();
+    return entry == null ? this.context.selectedAnnotation().orElse(null) : entry.key();
   }
 
   private void selectFocusedLayerOnCanvas() {
@@ -104,8 +104,8 @@ public final class LayerOrderDialog extends JDialog {
       return;
     }
     if (entry.visible()) {
-      this.context.selectAnnotation(entry.id());
-    } else if (this.context.selectedAnnotation().filter(entry.id()::equals).isPresent()) {
+      this.context.selectAnnotation(entry.key());
+    } else if (this.context.selectedAnnotation().filter(entry.key()::equals).isPresent()) {
       this.context.clearSelection();
     }
     this.context.repaintCanvas();
@@ -119,8 +119,8 @@ public final class LayerOrderDialog extends JDialog {
     final AnnotationEntry entry = this.model.getElementAt(row);
     final boolean visible = !entry.visible();
     this.session.recordUndoCheckpoint();
-    this.session.document().setVisible(entry.id(), visible);
-    if (!visible && this.context.selectedAnnotation().filter(entry.id()::equals).isPresent()) {
+    this.session.document().setVisible(entry.key(), visible);
+    if (!visible && this.context.selectedAnnotation().filter(entry.key()::equals).isPresent()) {
       this.context.clearSelection();
     }
     this.context.markDirty();
@@ -137,15 +137,15 @@ public final class LayerOrderDialog extends JDialog {
   }
 
   private void moveSelected(final int direction) {
-    final String name = this.selectedName();
-    if (name == null) {
+    final String key = this.selectedKey();
+    if (key == null) {
       return;
     }
     this.session.recordUndoCheckpoint();
     if (direction < 0) {
-      this.session.document().moveUp(name);
+      this.session.document().moveUp(key);
     } else {
-      this.session.document().moveDown(name);
+      this.session.document().moveDown(key);
     }
     this.context.markDirty();
     this.context.repaintCanvas();
@@ -153,17 +153,17 @@ public final class LayerOrderDialog extends JDialog {
   }
 
   private void renameSelected() {
-    final String oldName = this.selectedName();
-    if (oldName == null) {
+    final AnnotationEntry entry = this.list.getSelectedValue();
+    if (entry == null) {
       return;
     }
-    final String newName = JOptionPane.showInputDialog(this, "New unique label:", oldName);
+    final String newName = JOptionPane.showInputDialog(this, "New class label:", entry.id());
     if (newName == null || newName.isBlank()) {
       return;
     }
     try {
       this.session.recordUndoCheckpoint();
-      this.session.document().rename(oldName, newName.trim());
+      this.session.document().rename(entry.key(), newName.trim());
       this.context.markDirty();
       this.context.repaintCanvas();
       this.reload();

@@ -29,7 +29,7 @@ public final class AnnotationCreateFlow {
         context.session().document().nextFillColor(),
         coords);
     context.session().rememberClassId(id);
-    context.selectAnnotation(entry.id());
+    context.selectAnnotation(entry.key());
     context.markDirty();
     if (context instanceof ImageCanvas canvas) {
       canvas.activateSelectTool();

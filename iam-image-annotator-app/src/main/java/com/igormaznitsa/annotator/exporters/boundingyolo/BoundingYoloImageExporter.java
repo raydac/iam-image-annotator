@@ -24,6 +24,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -32,6 +33,7 @@ import java.util.TreeSet;
 import java.util.concurrent.CancellationException;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
@@ -48,6 +50,9 @@ public final class BoundingYoloImageExporter implements AnnotatedImagesExporter 
   private static final int EXPORT_START_PERCENT = 55;
   private static final int EXPORT_END_PERCENT = 100;
   private static final float JPEG_QUALITY = 0.95f;
+  private static final Pattern SPACES = Pattern.compile("\\s+");
+  private static final Pattern NON_YOLO_CLASS_NAME = Pattern.compile("[^a-z0-9_]+");
+  private static final Pattern UNDERSCORES = Pattern.compile("_+");
 
   private final int firstClassId;
   private final FileFilter fileFilter = new ExporterDirectoryFileFilter(TITLE);
@@ -159,8 +164,17 @@ public final class BoundingYoloImageExporter implements AnnotatedImagesExporter 
     }
   }
 
+  static String toYoloClassName(final String className) {
+    final String normalized = UNDERSCORES.matcher(NON_YOLO_CLASS_NAME.matcher(
+                SPACES.matcher(requireNonNull(className, "className").trim().toLowerCase(Locale.ROOT))
+                    .replaceAll("_"))
+            .replaceAll("_"))
+        .replaceAll("_");
+    return normalized.isEmpty() ? "class" : normalized;
+  }
+
   private Optional<RawBox> toRawBox(final AnnotationEntry entry) {
-    return this.boundsOf(entry).map(bounds -> new RawBox(entry.id(), bounds));
+    return this.boundsOf(entry).map(bounds -> new RawBox(toYoloClassName(entry.id()), bounds));
   }
 
   private Optional<YoloBoundingBox.Bounds> boundsOf(final AnnotationEntry entry) {

@@ -18,7 +18,7 @@ public interface EditorPanelContext {
 
   Optional<String> selectedAnnotation();
 
-  void selectAnnotation(String name);
+  void selectAnnotation(String key);
 
   void clearSelection();
 

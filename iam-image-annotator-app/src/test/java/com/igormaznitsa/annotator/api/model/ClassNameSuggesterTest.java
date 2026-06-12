@@ -14,30 +14,52 @@ class ClassNameSuggesterTest {
   }
 
   @Test
-  void suffixesWhenStickyLabelAlreadyTaken() {
+  void reusesStickyLabelWhenAlreadyTaken() {
     final AnnotationDocument document = new AnnotationDocument();
     document.add(new AnnotationEntry(
         "car",
         AnnotationType.RECTANGLE,
         "#ff0000",
         AnnotationCoords.rectangle(0, 0, 0.1, 0.1)));
-    assertEquals("car-2", ClassNameSuggester.suggest(document, Optional.of("car")));
+    assertEquals("car", ClassNameSuggester.suggest(document, Optional.of("car")));
   }
 
   @Test
-  void reusesLastEntryLabelBase() {
+  void suggestsUniqueNumberedClassWhenDocumentHasOtherLabels() {
     final AnnotationDocument document = new AnnotationDocument();
     document.add(new AnnotationEntry(
-        "person",
+        "coin",
         AnnotationType.RECTANGLE,
         "#ff0000",
         AnnotationCoords.rectangle(0, 0, 0.1, 0.1)));
-    assertEquals("person-2", ClassNameSuggester.suggest(document, Optional.empty()));
+    assertEquals("class_1", ClassNameSuggester.suggest(document, Optional.empty()));
+  }
+
+  @Test
+  void advancesNumberedSeriesWhenAutoLabelsExist() {
+    final AnnotationDocument document = new AnnotationDocument();
+    document.add(new AnnotationEntry(
+        "class_1",
+        AnnotationType.RECTANGLE,
+        "#ff0000",
+        AnnotationCoords.rectangle(0, 0, 0.1, 0.1)));
+    assertEquals("class_2", ClassNameSuggester.suggest(document, Optional.empty()));
+  }
+
+  @Test
+  void advancesStickyAutoLabelWhenAlreadyTaken() {
+    final AnnotationDocument document = new AnnotationDocument();
+    document.add(new AnnotationEntry(
+        "class_1",
+        AnnotationType.RECTANGLE,
+        "#ff0000",
+        AnnotationCoords.rectangle(0, 0, 0.1, 0.1)));
+    assertEquals("class_2", ClassNameSuggester.suggest(document, Optional.of("class_1")));
   }
 
   @Test
   void startsNumberedSeriesWhenEmpty() {
     final AnnotationDocument document = new AnnotationDocument();
-    assertEquals("class-1", ClassNameSuggester.suggest(document, Optional.empty()));
+    assertEquals("class_1", ClassNameSuggester.suggest(document, Optional.empty()));
   }
 }

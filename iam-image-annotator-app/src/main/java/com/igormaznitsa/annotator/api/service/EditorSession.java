@@ -21,7 +21,7 @@ public final class EditorSession {
   private final AnnotationDocumentHistory history = new AnnotationDocumentHistory();
   private Path filePath;
   private boolean dirty;
-  private String selectedAnnotation;
+  private String selectedAnnotationKey;
   private int selectedVertexIndex = -1;
   private String lastClassId;
 
@@ -108,16 +108,16 @@ public final class EditorSession {
   }
 
   public Optional<String> selectedAnnotation() {
-    return Optional.ofNullable(this.selectedAnnotation);
+    return Optional.ofNullable(this.selectedAnnotationKey);
   }
 
-  public void selectAnnotation(final String name) {
-    this.selectedAnnotation = name;
+  public void selectAnnotation(final String key) {
+    this.selectedAnnotationKey = key;
     this.selectedVertexIndex = -1;
   }
 
   public void clearSelection() {
-    this.selectedAnnotation = null;
+    this.selectedAnnotationKey = null;
     this.selectedVertexIndex = -1;
   }
 

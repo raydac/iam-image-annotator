@@ -63,11 +63,11 @@ public final class MaskColorTool extends AbstractMouseEditTool {
             context.session().document().entries(),
             normX,
             normY)
-        .flatMap(name -> context.session().document().findById(name));
+        .flatMap(key -> context.session().document().findByKey(key));
   }
 
   private void chooseMaskColor(final EditorPanelContext context, final AnnotationEntry entry) {
-    context.selectAnnotation(entry.id());
+    context.selectAnnotation(entry.key());
     context.repaintCanvas();
     if (entry.locked()) {
       context.updateStatus("Annotation is locked: " + entry.id());
@@ -87,7 +87,7 @@ public final class MaskColorTool extends AbstractMouseEditTool {
       return;
     }
     context.session().recordUndoCheckpoint();
-    context.session().document().updateFillColor(entry.id(), fillColorHex);
+    context.session().document().updateFillColor(entry.key(), fillColorHex);
     context.markDirty();
     context.repaintCanvas();
     context.updateStatus("Mask color updated: " + entry.id());

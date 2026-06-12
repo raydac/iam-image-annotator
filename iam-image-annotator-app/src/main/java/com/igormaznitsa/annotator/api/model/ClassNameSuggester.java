@@ -1,6 +1,5 @@
 package com.igormaznitsa.annotator.api.model;
 
-import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -10,8 +9,7 @@ public final class ClassNameSuggester {
 
   private static final String DEFAULT_PREFIX = "class";
   private static final Pattern NUMBERED_CLASS =
-      Pattern.compile("^class-(\\d+)$", Pattern.CASE_INSENSITIVE);
-  private static final Pattern SUFFIXED = Pattern.compile("^(.*)-(\\d+)$");
+      Pattern.compile("^class_(\\d+)$", Pattern.CASE_INSENSITIVE);
 
   private ClassNameSuggester() {
   }
@@ -19,29 +17,20 @@ public final class ClassNameSuggester {
   public static String suggest(final AnnotationDocument document,
                                final Optional<String> lastUsedId) {
     if (lastUsedId.isPresent()) {
-      return uniquify(document, lastUsedId.get());
-    }
-    final List<AnnotationEntry> entries = document.entries();
-    if (!entries.isEmpty()) {
-      return uniquify(document, entries.get(entries.size() - 1).id());
+      final String normalized = ClassNames.normalize(lastUsedId.get());
+      if (!isAutoNumberedLabel(normalized) || !labelExists(document, normalized)) {
+        return normalized;
+      }
     }
     return nextNumberedClass(document);
   }
 
-  static String uniquify(final AnnotationDocument document, final String base) {
-    final String normalized = ClassNames.normalize(base);
-    if (document.findById(normalized).isEmpty()) {
-      return normalized;
-    }
-    final Matcher suffixed = SUFFIXED.matcher(normalized);
-    final String stem = suffixed.matches() ? suffixed.group(1) : normalized;
-    for (int suffix = 2; suffix < 10_000; suffix++) {
-      final String candidate = stem + "-" + suffix;
-      if (document.findById(candidate).isEmpty()) {
-        return candidate;
-      }
-    }
-    return nextNumberedClass(document);
+  private static boolean isAutoNumberedLabel(final String label) {
+    return NUMBERED_CLASS.matcher(label).matches();
+  }
+
+  private static boolean labelExists(final AnnotationDocument document, final String label) {
+    return document.entries().stream().anyMatch(entry -> entry.id().equalsIgnoreCase(label));
   }
 
   private static String nextNumberedClass(final AnnotationDocument document) {
@@ -52,7 +41,10 @@ public final class ClassNameSuggester {
         max = Math.max(max, Integer.parseInt(matcher.group(1)));
       }
     }
-    final String candidate = String.format(Locale.ROOT, "%s-%d", DEFAULT_PREFIX, max + 1);
-    return document.findById(candidate).isPresent() ? uniquify(document, candidate) : candidate;
+    int candidate = max + 1;
+    while (labelExists(document, DEFAULT_PREFIX + '_' + candidate)) {
+      candidate++;
+    }
+    return String.format(Locale.ROOT, "%s_%d", DEFAULT_PREFIX, candidate);
   }
 }

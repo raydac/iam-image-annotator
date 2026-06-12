@@ -98,4 +98,21 @@ class AnnotationSelectionEditorTest {
     assertTrue(AnnotationSelectionEditor.hitAnnotation(List.of(entry), 0.5, 0.5).isEmpty());
     assertTrue(AnnotationSelectionEditor.hitHandle(entry, 0.5, 0.5, 1000, 1000).isEmpty());
   }
+
+  @Test
+  void hitAnnotationReturnsAnnotationKeyForDuplicateLabels() {
+    final AnnotationEntry first = new AnnotationEntry(
+        "cat",
+        AnnotationType.RECTANGLE,
+        "#ff0000",
+        AnnotationCoords.rectangle(0.1, 0.1, 0.2, 0.2));
+    final AnnotationEntry second = new AnnotationEntry(
+        "cat",
+        AnnotationType.RECTANGLE,
+        "#00ff00",
+        AnnotationCoords.rectangle(0.4, 0.4, 0.2, 0.2));
+
+    assertEquals(second.key(),
+        AnnotationSelectionEditor.hitAnnotation(List.of(first, second), 0.5, 0.5).orElseThrow());
+  }
 }

@@ -29,20 +29,15 @@ public final class ShapeEditFlow {
     if (!idChanged && !fillChanged) {
       return;
     }
-    if (idChanged && context.session().document().findById(values.id()).isPresent()) {
-      context.updateStatus("Label already used by another shape: " + values.id());
-      return;
-    }
     context.session().recordUndoCheckpoint();
     if (idChanged) {
-      final String oldId = entry.id();
-      context.session().document().rename(oldId, values.id());
+      context.session().document().rename(entry.key(), values.id());
       context.session().rememberClassId(values.id());
-      context.selectAnnotation(values.id());
+      context.selectAnnotation(entry.key());
     }
     if (fillChanged) {
       context.session().document().updateFillColor(
-          idChanged ? values.id() : entry.id(),
+          entry.key(),
           values.fillColorHex());
     }
     context.markDirty();

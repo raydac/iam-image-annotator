@@ -165,8 +165,9 @@ public final class VertexEditOperations {
       return;
     }
     final String shapeId = selected.get().id();
+    final String shapeKey = selected.get().key();
     context.session().recordUndoCheckpoint();
-    context.session().document().remove(shapeId);
+    context.session().document().remove(shapeKey);
     context.session().clearSelection();
     context.markDirty();
     context.updateStatus("Shape removed: " + shapeId);
@@ -230,9 +231,9 @@ public final class VertexEditOperations {
     context.session().recordUndoCheckpoint();
     try {
       if (result.type() == entry.type()) {
-        context.session().document().updateCoords(entry.id(), result.coords());
+        context.session().document().updateCoords(entry.key(), result.coords());
       } else {
-        context.session().document().updateAnnotation(entry.id(), result.type(), result.coords());
+        context.session().document().updateAnnotation(entry.key(), result.type(), result.coords());
       }
       context.markDirty();
       return true;
@@ -277,6 +278,6 @@ public final class VertexEditOperations {
 
   private static Optional<AnnotationEntry> selectedEntry(final EditorPanelContext context) {
     return context.selectedAnnotation()
-        .flatMap(name -> context.session().document().findById(name));
+        .flatMap(key -> context.session().document().findByKey(key));
   }
 }

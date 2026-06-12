@@ -150,16 +150,16 @@ public final class AnnotationSelectionEditor {
     if (rotation.isPresent()
         && isNearInImage(rotation.get(), normX, normY, ROTATION_HANDLE_RADIUS_PX, imageWidth,
         imageHeight)) {
-      return Optional.of(new AnnotationHandle.Rotate(entry.id()));
+      return Optional.of(new AnnotationHandle.Rotate(entry.key()));
     }
     final List<NormPoint> handles = handlePositions(entry);
     for (int i = 0; i < handles.size(); i++) {
       if (isNear(handles.get(i), normX, normY, HANDLE_RADIUS_NORM)) {
-        return Optional.of(new AnnotationHandle.Vertex(entry.id(), i));
+        return Optional.of(new AnnotationHandle.Vertex(entry.key(), i));
       }
     }
     if (contains(entry, normX, normY)) {
-      return Optional.of(new AnnotationHandle.Body(entry.id()));
+      return Optional.of(new AnnotationHandle.Body(entry.key()));
     }
     return Optional.empty();
   }
@@ -171,7 +171,7 @@ public final class AnnotationSelectionEditor {
     for (int i = entries.size() - 1; i >= 0; i--) {
       final AnnotationEntry entry = entries.get(i);
       if (entry.visible() && contains(entry, normX, normY)) {
-        return Optional.of(entry.id());
+        return Optional.of(entry.key());
       }
     }
     return Optional.empty();

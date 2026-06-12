@@ -187,8 +187,8 @@ public final class ImageCanvas extends JPanel implements EditorPanelContext, Scr
   }
 
   @Override
-  public void selectAnnotation(final String name) {
-    this.session.selectAnnotation(name);
+  public void selectAnnotation(final String key) {
+    this.session.selectAnnotation(key);
     this.notifySelectionChanged();
   }
 
@@ -256,7 +256,7 @@ public final class ImageCanvas extends JPanel implements EditorPanelContext, Scr
   public String askClassId(final String title, final String defaultValue) {
     this.refreshDisplay();
     final String input =
-        JOptionPane.showInputDialog(this, "Label (unique per shape; alphanumeric, _, ., -):", title,
+        JOptionPane.showInputDialog(this, "Class label (alphanumeric, _, ., -):", title,
             JOptionPane.QUESTION_MESSAGE);
     if (input == null || input.isBlank()) {
       return null;
@@ -289,7 +289,7 @@ public final class ImageCanvas extends JPanel implements EditorPanelContext, Scr
     final int imageHeight = this.image().getHeight();
     for (final AnnotationEntry entry : this.session.document().entries()) {
       final boolean selected = this.session.selectedAnnotation()
-          .map(name -> name.equals(entry.id()))
+          .map(key -> key.equals(entry.key()))
           .orElse(false);
       this.overlayRenderer.paintAnnotation(
           g2,
@@ -304,7 +304,7 @@ public final class ImageCanvas extends JPanel implements EditorPanelContext, Scr
       this.paintDraft(g2, imageWidth, imageHeight);
     }
     this.session.selectedAnnotation()
-        .flatMap(name -> this.session.document().findById(name))
+        .flatMap(key -> this.session.document().findByKey(key))
         .filter(AnnotationEntry::visible)
         .ifPresent(entry -> this.paintSelectionHandles(g2, imageWidth, imageHeight, entry));
     this.paintImageBorder(g2, imageWidth, imageHeight);

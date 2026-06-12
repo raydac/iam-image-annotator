@@ -29,6 +29,12 @@ class BoundingYoloImageExporterTest {
   private Path tempDir;
 
   @Test
+  void normalizesClassNamesForYoloFormat() {
+    assertEquals("big_car_2_left",
+        BoundingYoloImageExporter.toYoloClassName("  Big Car-2. Left  "));
+  }
+
+  @Test
   void exportsOnlyAnnotatedImagesWithBoundingLabels() throws IOException {
     final Path plain = this.tempDir.resolve("plain.png");
     final Path annotated = this.tempDir.resolve("annotated.png");
@@ -39,7 +45,7 @@ class BoundingYoloImageExporterTest {
 
     new BoundingYoloImageExporter(5, classIds -> {
       confirmed[0] = true;
-      assertEquals(Map.of("vehicle", 5), classIds);
+      assertEquals(Map.of("heavy_vehicle_1", 5), classIds);
       return true;
     }).exportImages(List.of(plain, annotated), dataset, ignored -> {
     });
@@ -58,7 +64,7 @@ class BoundingYoloImageExporterTest {
             "val: images/val",
             "",
             "names:",
-            "  5: vehicle"),
+            "  5: heavy_vehicle_1"),
         Files.readAllLines(dataset.resolve("data.yaml")));
     final BufferedImage exported =
         ImageIO.read(dataset.resolve("images").resolve("train").resolve("annotated.jpg").toFile());
@@ -86,7 +92,7 @@ class BoundingYoloImageExporterTest {
   private void writeAnnotatedImage(final Path path) throws IOException {
     final AnnotationDocument document = new AnnotationDocument();
     document.add(new AnnotationEntry(
-        "vehicle",
+        "Heavy-Vehicle.1",
         AnnotationType.RECTANGLE,
         "#ff0000",
         AnnotationCoords.rectangle(0.25, 0.25, 0.5, 0.5)));
