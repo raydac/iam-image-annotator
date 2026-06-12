@@ -67,12 +67,48 @@ public final class AnnotatedPng {
 
   public static AnnotatedPng read(final InputStream input) throws IOException {
     final PngChunkIO chunkIo = new PngChunkIO();
-    final List<PngChunk> chunks = chunkIo.readAll(input);
+    final List<PngChunk> chunks = readAnnotationChunks(input);
 
     final AnnotationDocument document = resolveDocument(chunks);
     final BufferedImage baseImage = resolveBaseImage(chunkIo, chunks);
 
     return new AnnotatedPng(baseImage, document);
+  }
+
+  private static List<PngChunk> readAnnotationChunks(final InputStream input) throws IOException {
+    final DataInputStream data = new DataInputStream(input);
+    if (!isPngFile(data.readNBytes(PngConstants.SIGNATURE.length))) {
+      throw new IOException("Not a PNG file");
+    }
+
+    final List<PngChunk> chunks = new java.util.ArrayList<>();
+    boolean baseImageFound = false;
+    while (true) {
+      final int length = data.readInt();
+      if (length < 0) {
+        throw new IOException("Invalid PNG chunk length: " + length);
+      }
+      final String type = PngChunkType.decode(data.readInt());
+      if (PngConstants.isCustomChunk(type) || !baseImageFound) {
+        chunks.add(new PngChunk(type, readChunkData(data, length)));
+        baseImageFound = baseImageFound || PngConstants.isIbseChunk(type);
+      } else {
+        data.skipNBytes(length);
+      }
+      data.skipNBytes(Integer.BYTES);
+      if ("IEND".equals(type)) {
+        return List.copyOf(chunks);
+      }
+    }
+  }
+
+  private static byte[] readChunkData(final DataInputStream data, final int length)
+      throws IOException {
+    final byte[] result = data.readNBytes(length);
+    if (result.length != length) {
+      throw new IOException("Unexpected end of PNG chunk data");
+    }
+    return result;
   }
 
   private static AnnotationDocument resolveDocument(final List<PngChunk> chunks) {

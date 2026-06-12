@@ -36,8 +36,13 @@ public final class YoloDatasetSplitter {
     final List<ClusterStats> validationClusters = new ArrayList<>();
 
     for (final ClusterStats cluster : clusters) {
-      this.assignCluster(cluster, totalClassCounts, train, validation, trainClusters,
-          validationClusters);
+      if (validation.canAccept(cluster)) {
+        validation.add(cluster);
+        validationClusters.add(cluster);
+      } else {
+        train.add(cluster);
+        trainClusters.add(cluster);
+      }
     }
 
     this.rebalanceEmptySplits(train, validation, trainClusters, validationClusters);
@@ -112,63 +117,12 @@ public final class YoloDatasetSplitter {
     return leftNorm == 0.0d || rightNorm == 0.0d ? 0.0d : dot / (leftNorm * rightNorm);
   }
 
-  private void assignCluster(final ClusterStats cluster,
-                             final Map<Integer, Integer> totalClassCounts,
-                             final SplitStats train,
-                             final SplitStats validation,
-                             final List<ClusterStats> trainClusters,
-                             final List<ClusterStats> validationClusters) {
-    if (this.benefit(cluster, train, totalClassCounts) >= this.benefit(
-        cluster, validation, totalClassCounts)) {
-      train.add(cluster);
-      trainClusters.add(cluster);
-      return;
-    }
-    validation.add(cluster);
-    validationClusters.add(cluster);
-  }
-
-  private double benefit(final ClusterStats cluster, final SplitStats split,
-                         final Map<Integer, Integer> totalClassCounts) {
-    double score = -Math.abs(split.targetImages - split.imageCount - cluster.imageCount) * 4.0d;
-    if (split.imageCount + cluster.imageCount > split.targetImages) {
-      score -= (split.imageCount + cluster.imageCount - split.targetImages) * 8.0d;
-    }
-
-    for (final Map.Entry<Integer, Integer> entry : cluster.classCounts.entrySet()) {
-      final double rarityWeight = 1.0d / totalClassCounts.get(entry.getKey());
-      final int target = split.targetClassCounts.getOrDefault(entry.getKey(), 0);
-      final int current = split.classCounts.getOrDefault(entry.getKey(), 0);
-      score += Math.clamp(target - current, 0, entry.getValue()) * rarityWeight * 40.0d;
-      score -= Math.max(0, current + entry.getValue() - target) * rarityWeight * 8.0d;
-      if (current == 0) {
-        score += rarityWeight * 20.0d;
-      }
-    }
-
-    score += this.distributionBenefit(cluster.zoneDistribution, split.zoneCounts,
-        split.targetZoneCounts);
-    score += this.distributionBenefit(cluster.sizeDistribution, split.sizeCounts,
-        split.targetSizeCounts);
-    return score;
-  }
-
-  private <E extends Enum<E>> double distributionBenefit(
-      final Map<E, Integer> cluster,
-      final Map<E, Integer> current,
-      final Map<E, Integer> target) {
-    return cluster.entrySet().stream()
-        .mapToDouble(entry -> Math.clamp(target.getOrDefault(entry.getKey(), 0)
-                - current.getOrDefault(entry.getKey(), 0), 0,
-            entry.getValue()))
-        .sum();
-  }
-
   private void rebalanceEmptySplits(final SplitStats train,
                                     final SplitStats validation,
                                     final List<ClusterStats> trainClusters,
                                     final List<ClusterStats> validationClusters) {
-    if (validationClusters.isEmpty() && trainClusters.size() > 1) {
+    if (validationClusters.isEmpty() && trainClusters.size() > 1
+        && trainClusters.stream().anyMatch(validation::canAccept)) {
       this.moveSmallestCluster(train, validation, trainClusters, validationClusters);
     }
     if (trainClusters.isEmpty() && validationClusters.size() > 1) {
@@ -198,6 +152,7 @@ public final class YoloDatasetSplitter {
                                    final List<ClusterStats> sourceClusters,
                                    final List<ClusterStats> targetClusters) {
     final ClusterStats cluster = sourceClusters.stream()
+        .filter(target::canAccept)
         .min(Comparator.comparingInt(ClusterStats::imageCount))
         .orElseThrow();
     source.remove(cluster);
@@ -213,6 +168,7 @@ public final class YoloDatasetSplitter {
                                 final List<ClusterStats> targetClusters) {
     sourceClusters.stream()
         .filter(cluster -> cluster.classCounts.containsKey(classId))
+        .filter(target::canAccept)
         .filter(cluster -> source.classCounts.getOrDefault(classId, 0)
             - cluster.classCounts.getOrDefault(classId, 0) > 0)
         .min(Comparator.comparingInt(ClusterStats::imageCount))
@@ -237,23 +193,25 @@ public final class YoloDatasetSplitter {
   private static final class SplitStats {
 
     private final int targetImages;
-    private final Map<Integer, Integer> targetClassCounts;
-    private final Map<ImageZone, Integer> targetZoneCounts;
-    private final Map<BoundingBoxSize, Integer> targetSizeCounts;
     private final Map<Integer, Integer> classCounts = new HashMap<>();
     private final Map<ImageZone, Integer> zoneCounts = new EnumMap<>(ImageZone.class);
     private final Map<BoundingBoxSize, Integer> sizeCounts = new EnumMap<>(BoundingBoxSize.class);
     private int imageCount;
 
     private SplitStats(final List<YoloImageSample> samples, final double ratio) {
-      this.targetImages = Math.max(1, (int) Math.round(samples.size() * ratio));
-      this.targetClassCounts = targetCounts(samples, ratio, YoloImageSample::classCounts);
-      this.targetZoneCounts = targetCounts(samples, ratio, YoloImageSample::zoneDistribution);
-      this.targetSizeCounts = targetCounts(samples, ratio, YoloImageSample::bboxSizeDistribution);
+      this.targetImages = targetImageCount(samples.size(), ratio);
     }
 
     static SplitStats forRatio(final List<YoloImageSample> samples, final double ratio) {
       return new SplitStats(samples, ratio);
+    }
+
+    private static int targetImageCount(final int totalImages, final double ratio) {
+      final int rounded = (int) Math.round(totalImages * ratio);
+      if (ratio < 0.5d) {
+        return totalImages <= 1 ? 0 : Math.min(totalImages - 1, Math.max(1, rounded));
+      }
+      return Math.min(totalImages, Math.max(1, rounded));
     }
 
     private static <K> void addAll(final Map<K, Integer> target, final Map<K, Integer> source) {
@@ -265,16 +223,6 @@ public final class YoloDatasetSplitter {
       source.forEach((key, value) -> target.computeIfPresent(
           key,
           (ignored, current) -> current > value ? current - value : null));
-    }
-
-    private static <K> Map<K, Integer> targetCounts(
-        final List<YoloImageSample> samples,
-        final double ratio,
-        final java.util.function.Function<YoloImageSample, Map<K, Integer>> extractor) {
-      final Map<K, Integer> result = new HashMap<>();
-      samples.stream().map(extractor).forEach(map -> addAll(result, map));
-      result.replaceAll((ignored, value) -> Math.max(1, (int) Math.round(value * ratio)));
-      return result;
     }
 
     void add(final ClusterStats cluster) {
@@ -289,6 +237,10 @@ public final class YoloDatasetSplitter {
       subtractAll(this.classCounts, cluster.classCounts);
       subtractAll(this.zoneCounts, cluster.zoneDistribution);
       subtractAll(this.sizeCounts, cluster.sizeDistribution);
+    }
+
+    boolean canAccept(final ClusterStats cluster) {
+      return this.imageCount + cluster.imageCount <= this.targetImages;
     }
   }
 

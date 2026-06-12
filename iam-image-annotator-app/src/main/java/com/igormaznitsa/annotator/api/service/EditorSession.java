@@ -7,6 +7,7 @@ import com.igormaznitsa.annotator.api.model.ClassNames;
 import com.igormaznitsa.annotator.api.png.AnnotatedPng;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -35,8 +36,10 @@ public final class EditorSession {
   }
 
   public static EditorSession open(final Path filePath) throws IOException {
-    final AnnotatedPng annotated = AnnotatedPng.read(Files.newInputStream(filePath));
-    return new EditorSession(filePath, annotated.baseImage(), annotated.document());
+    try (InputStream input = Files.newInputStream(filePath)) {
+      final AnnotatedPng annotated = AnnotatedPng.read(input);
+      return new EditorSession(filePath, annotated.baseImage(), annotated.document());
+    }
   }
 
   public static EditorSession fromImage(final Path filePath, final BufferedImage image) {

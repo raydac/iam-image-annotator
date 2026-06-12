@@ -11,6 +11,24 @@ import org.junit.jupiter.api.Test;
 class YoloDatasetSplitterTest {
 
   @Test
+  void keepsValidationSetAtTwentyPercentWhenClustersFit() {
+    final YoloDatasetSplit split = new YoloDatasetSplitter().split(List.of(
+        this.sample("image-0.png", 0x0000_0000_0000_0000L, 0),
+        this.sample("image-1.png", 0x0000_0000_FFFF_FFFFL, 1),
+        this.sample("image-2.png", 0x0000_FFFF_0000_FFFFL, 2),
+        this.sample("image-3.png", 0x0000_FFFF_FFFF_0000L, 3),
+        this.sample("image-4.png", 0xFFFF_0000_0000_FFFFL, 4),
+        this.sample("image-5.png", 0xFFFF_0000_FFFF_0000L, 5),
+        this.sample("image-6.png", 0xFFFF_FFFF_0000_0000L, 6),
+        this.sample("image-7.png", 0x00FF_00FF_00FF_00FFL, 7),
+        this.sample("image-8.png", 0xFF00_FF00_FF00_FF00L, 8),
+        this.sample("image-9.png", 0x0F0F_0F0F_0F0F_0F0FL, 9)));
+
+    assertEquals(8, split.train().size());
+    assertEquals(2, split.validation().size());
+  }
+
+  @Test
   void keepsVisuallySimilarSamplesInSameSplit() {
     final YoloImageSample nearDuplicateA = this.sample("near-a.png", 0x00AA_AAAA_AAAA_AAAAL, 0);
     final YoloImageSample nearDuplicateB = this.sample("near-b.png", 0x00AA_AAAA_AAAA_AAAAL, 0);
