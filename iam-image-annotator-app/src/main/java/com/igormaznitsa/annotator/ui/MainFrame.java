@@ -4,6 +4,9 @@ import com.igormaznitsa.annotator.api.json.AnnotationJsonCodec;
 import com.igormaznitsa.annotator.api.png.AnnotatedPng;
 import com.igormaznitsa.annotator.api.service.AllowedImageFiles;
 import com.igormaznitsa.annotator.api.service.EditorSession;
+import com.igormaznitsa.annotator.exporters.api.AnnotatedImagesExporter;
+import com.igormaznitsa.annotator.exporters.api.ExportProgress;
+import com.igormaznitsa.annotator.exporters.boundingyolo.BoundingYoloImageExporter;
 import com.igormaznitsa.annotator.ui.api.TreeOperationContext;
 import com.igormaznitsa.annotator.ui.component.ProgressGlassPane;
 import com.igormaznitsa.annotator.ui.dialog.SettingsDialog;
@@ -41,10 +44,15 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 import javax.imageio.ImageIO;
 import javax.swing.AbstractAction;
 import javax.swing.JFileChooser;
@@ -59,6 +67,7 @@ import javax.swing.JRootPane;
 import javax.swing.JSplitPane;
 import javax.swing.KeyStroke;
 import javax.swing.SwingWorker;
+import javax.swing.filechooser.FileFilter;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
 public final class MainFrame extends JFrame implements TreeOperationContext {
@@ -74,6 +83,8 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
       new EditTreeOperation(),
       new RefreshTreeOperation(),
       new ExportTreeOperation()));
+  private final List<AnnotatedImagesExporter> annotatedImageExporters =
+      List.of(new BoundingYoloImageExporter(0));
   private final List<com.igormaznitsa.annotator.ui.api.ImageViewAction> viewActions = List.of(
       new ZoomInAction(),
       new ZoomOutAction());
@@ -92,6 +103,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
   private final JMenuItem saveItem = new JMenuItem("Save");
   private final JMenuItem saveAsItem = new JMenuItem("Save as...");
   private final JMenuItem saveAllItem = new JMenuItem("Save All");
+  private final JMenuItem exportAsItem = new JMenuItem("Export as...");
   private final JMenuItem undoItem = new JMenuItem("Undo");
   private final JMenuItem redoItem = new JMenuItem("Redo");
   private final JMenuItem showJsonItem = new JMenuItem("Show JSON");
@@ -140,6 +152,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
   public void refreshTree() {
     this.fileTree.refresh();
     this.treeOperations.refreshState(this);
+    this.updateMenuItems();
   }
 
   @Override
@@ -196,8 +209,10 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     this.saveItem.addActionListener(event -> this.saveActive());
     this.saveAsItem.addActionListener(event -> this.saveActiveAs());
     this.saveAllItem.addActionListener(event -> this.saveAll());
+    this.exportAsItem.addActionListener(event -> this.exportAs());
     file.add(openFolder);
     file.add(openFile);
+    file.add(this.exportAsItem);
     file.addSeparator();
     file.add(this.saveItem);
     file.add(this.saveAsItem);
@@ -262,7 +277,10 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     this.editorTabs.setRevealInTreeListener(path -> this.fileTree.reveal(path));
     this.editorTabs.setSessionClosedListener(this.workspace::close);
     this.fileTree.setFileOpenListener(this::openPath);
-    this.fileTree.addSelectionListener(event -> this.treeOperations.refreshState(this));
+    this.fileTree.addSelectionListener(event -> {
+      this.treeOperations.refreshState(this);
+      this.updateMenuItems();
+    });
   }
 
   private void registerExitConfirmation() {
@@ -345,6 +363,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
       try {
         this.fileTree.openFolder(this.selectedFolder(chooser));
         this.treeOperations.refreshState(this);
+        this.updateMenuItems();
       } catch (final IOException exception) {
         this.showError(exception.getMessage());
       }
@@ -368,6 +387,148 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     chooser.setFileFilter(new FileNameExtensionFilter("PNG images", "png"));
     if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
       this.openPath(chooser.getSelectedFile().toPath());
+    }
+  }
+
+  private void exportAs() {
+    final List<Path> imageFiles = this.selectedExportableImages();
+    if (imageFiles.isEmpty()) {
+      this.showError("Select one or more PNG images or folders to export.");
+      return;
+    }
+
+    final JFileChooser chooser = new JFileChooser();
+    chooser.setDialogTitle("Export annotated images as...");
+    chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+    chooser.setAcceptAllFileFilterUsed(false);
+    this.annotatedImageExporters.forEach(exporter -> chooser.addChoosableFileFilter(
+        exporter.fileFilter()));
+    chooser.setFileFilter(this.annotatedImageExporters.getFirst().fileFilter());
+    if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+      return;
+    }
+
+    final AnnotatedImagesExporter selected = this.selectedExporter(chooser.getFileFilter());
+    this.configuredExporter(selected).ifPresent(exporter -> this.exportImagesWithProgress(
+        exporter,
+        imageFiles,
+        this.selectedFolder(chooser)));
+  }
+
+  private boolean canExportAs() {
+    if (!this.fileTree.hasOpenFolder()) {
+      return false;
+    }
+    return this.fileTree.selectedPaths().stream().anyMatch(this::isExportSelection);
+  }
+
+  private boolean isExportSelection(final Path path) {
+    return Files.isDirectory(path)
+        || (Files.isRegularFile(path) && AllowedImageFiles.isAllowed(path));
+  }
+
+  private List<Path> selectedExportableImages() {
+    final Set<Path> result = new LinkedHashSet<>();
+    for (final Path path : this.fileTree.selectedPaths()) {
+      if (Files.isRegularFile(path) && AllowedImageFiles.isAllowed(path)) {
+        result.add(path);
+      } else if (Files.isDirectory(path)) {
+        this.collectExportableImages(path, result);
+      }
+    }
+    return result.stream().sorted(Comparator.comparing(Path::toString)).toList();
+  }
+
+  private void collectExportableImages(final Path folder, final Set<Path> result) {
+    try (Stream<Path> walk = Files.walk(folder)) {
+      walk.filter(Files::isRegularFile)
+          .filter(AllowedImageFiles::isAllowed)
+          .forEach(result::add);
+    } catch (final IOException ignored) {
+      // skip unreadable folder branch
+    }
+  }
+
+  private AnnotatedImagesExporter selectedExporter(final FileFilter selectedFilter) {
+    return this.annotatedImageExporters.stream()
+        .filter(exporter -> exporter.fileFilter().equals(selectedFilter))
+        .findFirst()
+        .orElse(this.annotatedImageExporters.getFirst());
+  }
+
+  private Optional<AnnotatedImagesExporter> configuredExporter(
+      final AnnotatedImagesExporter exporter) {
+    if (exporter instanceof BoundingYoloImageExporter) {
+      return this.promptBoundingYoloExporter();
+    }
+    return Optional.of(exporter);
+  }
+
+  private Optional<AnnotatedImagesExporter> promptBoundingYoloExporter() {
+    while (true) {
+      final String value = JOptionPane.showInputDialog(
+          this,
+          "First YOLO class id:",
+          "0");
+      if (value == null) {
+        return Optional.empty();
+      }
+      try {
+        return Optional.of(new BoundingYoloImageExporter(Integer.parseInt(value.strip())));
+      } catch (final IllegalArgumentException exception) {
+        this.showError("Class id must be a non-negative integer.");
+      }
+    }
+  }
+
+  private void exportImagesWithProgress(
+      final AnnotatedImagesExporter exporter,
+      final List<Path> imageFiles,
+      final Path destinationFolder) {
+    this.showProgressOverlay("Exporting annotated images...");
+    final SwingWorker<Integer, ExportProgress> worker = new SwingWorker<>() {
+      @Override
+      protected Integer doInBackground() throws Exception {
+        exporter.exportImages(imageFiles, destinationFolder, this::publish);
+        return imageFiles.size();
+      }
+
+      @Override
+      protected void process(final List<ExportProgress> chunks) {
+        final ExportProgress progress = chunks.getLast();
+        MainFrame.this.updateExportProgress(progress);
+      }
+
+      @Override
+      protected void done() {
+        MainFrame.this.completeExportTask(this, exporter, destinationFolder);
+      }
+    };
+    worker.execute();
+  }
+
+  private void updateExportProgress(final ExportProgress progress) {
+    final String message = progress.stage() + " (" + progress.percent() + "%)";
+    this.progressGlassPane.setMessage(message);
+    this.statusLabel.setText(message);
+  }
+
+  private void completeExportTask(
+      final SwingWorker<Integer, ExportProgress> worker,
+      final AnnotatedImagesExporter exporter,
+      final Path destinationFolder) {
+    try {
+      worker.get();
+      this.hideProgressOverlay();
+      this.statusLabel.setText("Exported " + exporter.title());
+      this.showInfo("Exported " + exporter.title() + " to " + destinationFolder);
+    } catch (final InterruptedException exception) {
+      Thread.currentThread().interrupt();
+      this.hideProgressOverlay();
+      this.showError("Export interrupted: " + exception.getMessage());
+    } catch (final ExecutionException exception) {
+      this.hideProgressOverlay();
+      this.showError("Export failed: " + this.toException(exception.getCause()).getMessage());
     }
   }
 
@@ -612,6 +773,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     this.saveItem.setEnabled(dirtyActive);
     this.saveAsItem.setEnabled(hasActiveEditor);
     this.saveAllItem.setEnabled(this.workspace.hasDirtySessions());
+    this.exportAsItem.setEnabled(this.canExportAs());
     this.undoItem.setEnabled(hasActiveEditor && canvas.session().canUndo());
     this.redoItem.setEnabled(hasActiveEditor && canvas.session().canRedo());
     this.showJsonItem.setEnabled(hasActiveEditor);

@@ -20,6 +20,7 @@
 - 2026-06-11: File tree folders now use Swing Look & Feel `Tree.closedIcon`/`Tree.openIcon` with `folder.png` fallback instead of `box_open.png`.
 - 2026-06-11: Editor toolbar now includes a mask color tool; toggle it, then double-click a mask to open a class-titled Swing color chooser and update annotation fill with undo support.
 - 2026-06-11: Mask/fill color chooser now shows Look & Feel-safe quick pure-color icon swatches above the standard Swing chooser for faster annotation color selection.
+- 2026-06-12: Added File > Export as... with annotated-image exporter filters and first implementation for YOLO bounding-box train/val datasets; menu enables for selected tree folders and exports all allowed PNGs recursively.
 
 ## 2. Architecture & Technical Discoveries
 - Java 21 Maven project; use `mvn22` for builds and tests.
@@ -30,12 +31,14 @@
 - Magic wand flood-fill masks are converted to polygon annotations in `MagicWandMaskContour`; border-edge tracing is used to avoid cycles from irregular boundary-pixel ordering.
 - `MainFrame` runs long open/save tasks through a `SwingWorker` plus reusable `ProgressGlassPane`; existing-open tabs are selected immediately.
 - `FileTreePanel.refresh()` rebuilds from disk while restoring expanded folder paths and still-existing selections.
+- Annotated-image exporter API lives in `exporters.api`; shared exporter helpers live in `exporters.common`; each concrete exporter keeps its implementation classes in its own `exporters.<name>` subpackage.
+- YOLO bounding exporter skips plain/unannotated PNGs, exports visible annotations as bounding boxes, writes base images from `iBSE` as JPEG quality 95, and uses `YoloDatasetSplitter` to keep similar images in the same train/val split.
 
 ## 3. Technical Debt & Refactoring
 - Some Swing UI methods return `null` internally for optional UI state; consider tightening to `Optional` where it improves call-site clarity.
 
 ## 4. Current Work In Progress
-- Toggle/double-click mask color toolbar tool and pure-color chooser palette added; `mvn22 -pl iam-image-annotator-app test` passes.
+- File > Export as... YOLO bounding dataset exporter added; `mvn22 -pl iam-image-annotator-app test` passes.
 
 ## 5. Known Issues & Limitations
 - No changelog file is present in the project root.
