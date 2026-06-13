@@ -44,9 +44,36 @@ public final class AnnotatedPng {
     }
   }
 
+  public static AnnotationDocument readDocument(final Path path) throws IOException {
+    try (final InputStream input = Files.newInputStream(path)) {
+      return readDocument(input);
+    }
+  }
+
+  public static AnnotationDocument readDocument(final InputStream input) throws IOException {
+    final DataInputStream data = new DataInputStream(input);
+    if (hasInvalidPngSignature(data.readNBytes(PngConstants.SIGNATURE.length))) {
+      throw new IOException("Not a PNG file");
+    }
+    while (true) {
+      final int length = data.readInt();
+      if (length < 0) {
+        throw new IOException("Invalid PNG chunk length: " + length);
+      }
+      final String type = PngChunkType.decode(data.readInt());
+      if (PngConstants.isIannChunk(type)) {
+        return new AnnotationJsonCodec().decode(readChunkData(data, length));
+      }
+      data.skipNBytes((long) length + Integer.BYTES);
+      if ("IEND".equals(type)) {
+        return new AnnotationDocument();
+      }
+    }
+  }
+
   public static boolean hasAnnotationChunks(final InputStream input) throws IOException {
     final DataInputStream data = new DataInputStream(input);
-    if (!isPngFile(data.readNBytes(PngConstants.SIGNATURE.length))) {
+    if (hasInvalidPngSignature(data.readNBytes(PngConstants.SIGNATURE.length))) {
       return false;
     }
     while (true) {
@@ -77,7 +104,7 @@ public final class AnnotatedPng {
 
   private static List<PngChunk> readAnnotationChunks(final InputStream input) throws IOException {
     final DataInputStream data = new DataInputStream(input);
-    if (!isPngFile(data.readNBytes(PngConstants.SIGNATURE.length))) {
+    if (hasInvalidPngSignature(data.readNBytes(PngConstants.SIGNATURE.length))) {
       throw new IOException("Not a PNG file");
     }
 
@@ -145,7 +172,7 @@ public final class AnnotatedPng {
   }
 
   private static BufferedImage decodeBaseImage(final byte[] ibsePayload) throws IOException {
-    if (!isPngFile(ibsePayload)) {
+    if (hasInvalidPngSignature(ibsePayload)) {
       throw new IOException("iBSE chunk is not a PNG file");
     }
     try (ImageInputStream stream = ImageIO.createImageInputStream(
@@ -168,9 +195,9 @@ public final class AnnotatedPng {
     }
   }
 
-  private static boolean isPngFile(final byte[] data) {
-    return data.length >= PngConstants.SIGNATURE.length
-        && Arrays.equals(data, 0, PngConstants.SIGNATURE.length, PngConstants.SIGNATURE, 0,
+  private static boolean hasInvalidPngSignature(final byte[] data) {
+    return data.length < PngConstants.SIGNATURE.length
+        || !Arrays.equals(data, 0, PngConstants.SIGNATURE.length, PngConstants.SIGNATURE, 0,
         PngConstants.SIGNATURE.length);
   }
 

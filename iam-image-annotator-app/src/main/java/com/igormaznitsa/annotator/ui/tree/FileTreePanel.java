@@ -1,7 +1,5 @@
 package com.igormaznitsa.annotator.ui.tree;
 
-import static java.util.Objects.nonNull;
-
 import com.igormaznitsa.annotator.api.service.AllowedImageFiles;
 import com.igormaznitsa.annotator.ui.icons.IconService;
 import java.awt.Font;
@@ -18,6 +16,7 @@ import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -39,7 +38,6 @@ public final class FileTreePanel extends JScrollPane {
 
   static final String NO_FOLDER_MESSAGE = "No folder selected";
 
-  private final IconService icons;
   private final JTree tree = new JTree();
   private Path rootFolder;
   private Consumer<Path> fileOpenListener = ignored -> {
@@ -47,7 +45,6 @@ public final class FileTreePanel extends JScrollPane {
 
   public FileTreePanel(final IconService icons) {
     super();
-    this.icons = icons;
     this.tree.setRootVisible(true);
     this.tree.setShowsRootHandles(true);
     this.tree.getSelectionModel().setSelectionMode(TreeSelectionModel.DISCONTIGUOUS_TREE_SELECTION);
@@ -86,11 +83,42 @@ public final class FileTreePanel extends JScrollPane {
     for (final TreePath path : paths) {
       final Object last = path.getLastPathComponent();
       if (last instanceof DefaultMutableTreeNode mutable
-          && mutable.getUserObject() instanceof FileTreeNode node) {
-        result.add(node.path());
+          && mutable.getUserObject() instanceof FileTreeNode(Path pathValue)) {
+        result.add(pathValue);
       }
     }
     return result;
+  }
+
+  public List<Path> imagePaths() {
+    if (this.rootFolder == null) {
+      return List.of();
+    }
+    final Object root = this.tree.getModel().getRoot();
+    if (!(root instanceof DefaultMutableTreeNode mutable)) {
+      return List.of();
+    }
+    final List<Path> result = new ArrayList<>();
+    this.collectImagePaths(mutable, result);
+    return List.copyOf(result);
+  }
+
+  public void selectPaths(final List<Path> paths) {
+    final Object root = this.tree.getModel().getRoot();
+    if (!(root instanceof DefaultMutableTreeNode mutable)) {
+      return;
+    }
+    final List<TreePath> treePaths = paths.stream()
+        .map(path -> this.findNode(mutable, path))
+        .filter(Objects::nonNull)
+        .map(node -> new TreePath(node.getPath()))
+        .toList();
+    if (treePaths.isEmpty()) {
+      this.tree.clearSelection();
+      return;
+    }
+    this.tree.setSelectionPaths(treePaths.toArray(TreePath[]::new));
+    treePaths.stream().findFirst().ifPresent(this.tree::scrollPathToVisible);
   }
 
   public void openFolder(final Path folder) throws IOException {
@@ -136,8 +164,8 @@ public final class FileTreePanel extends JScrollPane {
     }
     final Object last = treePath.getLastPathComponent();
     if (last instanceof DefaultMutableTreeNode mutable
-        && mutable.getUserObject() instanceof FileTreeNode node) {
-      this.openFile(node.path());
+        && mutable.getUserObject() instanceof FileTreeNode(Path path)) {
+      this.openFile(path);
     }
   }
 
@@ -172,7 +200,7 @@ public final class FileTreePanel extends JScrollPane {
   }
 
   private DefaultMutableTreeNode findNode(final DefaultMutableTreeNode parent, final Path target) {
-    if (parent.getUserObject() instanceof FileTreeNode node && node.path().equals(target)) {
+    if (parent.getUserObject() instanceof FileTreeNode(Path path) && path.equals(target)) {
       return parent;
     }
     for (int i = 0; i < parent.getChildCount(); i++) {
@@ -183,6 +211,17 @@ public final class FileTreePanel extends JScrollPane {
       }
     }
     return null;
+  }
+
+  private void collectImagePaths(final DefaultMutableTreeNode parent, final List<Path> result) {
+    if (parent.getUserObject() instanceof FileTreeNode(Path path)
+        && Files.isRegularFile(path)
+        && AllowedImageFiles.isAllowed(path)) {
+      result.add(path);
+    }
+    for (int i = 0; i < parent.getChildCount(); i++) {
+      this.collectImagePaths((DefaultMutableTreeNode) parent.getChildAt(i), result);
+    }
   }
 
   private void rebuildTree(final Set<Path> expandedFolders, final Set<Path> selectedPaths)
@@ -219,8 +258,8 @@ public final class FileTreePanel extends JScrollPane {
   private Optional<Path> pathFrom(final TreePath treePath) {
     final Object last = treePath.getLastPathComponent();
     if (last instanceof DefaultMutableTreeNode mutable
-        && mutable.getUserObject() instanceof FileTreeNode node) {
-      return Optional.of(node.path());
+        && mutable.getUserObject() instanceof FileTreeNode(Path path)) {
+      return Optional.of(path);
     }
     return Optional.empty();
   }
@@ -241,7 +280,7 @@ public final class FileTreePanel extends JScrollPane {
       final Set<Path> selectedPaths) {
     final List<TreePath> restored = selectedPaths.stream()
         .map(path -> this.findNode(root, path))
-        .filter(node -> nonNull(node))
+        .filter(Objects::nonNull)
         .map(node -> new TreePath(node.getPath()))
         .toList();
     this.tree.setSelectionPaths(restored.toArray(TreePath[]::new));
@@ -298,9 +337,9 @@ public final class FileTreePanel extends JScrollPane {
           this.setFont(this.getFont().deriveFont(Font.ITALIC));
           return this;
         }
-        if (user instanceof FileTreeNode node) {
-          this.setText(node.path().getFileName().toString());
-          if (Files.isDirectory(node.path())) {
+        if (user instanceof FileTreeNode(Path path)) {
+          this.setText(path.getFileName().toString());
+          if (Files.isDirectory(path)) {
             this.setIcon(this.folderIcon(expanded));
           } else {
             this.setIcon(this.icons.icon16("image.png"));

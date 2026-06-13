@@ -119,6 +119,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
   private final JMenuItem exitItem = new JMenuItem("Exit");
   private final JMenuItem undoItem = new JMenuItem("Undo");
   private final JMenuItem redoItem = new JMenuItem("Redo");
+  private final JMenuItem selectNonAnnotatedItem = new JMenuItem("Select all non annotated");
   private final JMenuItem showJsonItem = new JMenuItem("Show JSON");
 
   public MainFrame() {
@@ -251,11 +252,14 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     this.redoItem.setAccelerator(this.menuShortcut(KeyEvent.VK_Y));
     this.undoItem.addActionListener(event -> this.undoActive());
     this.redoItem.addActionListener(event -> this.redoActive());
+    this.selectNonAnnotatedItem.addActionListener(event -> this.selectNonAnnotatedImages());
     final JMenuItem settings = new JMenuItem("Settings");
     settings.addActionListener(event -> SettingsDialog.show(this));
     this.showJsonItem.addActionListener(event -> this.showActiveJson());
     edit.add(this.undoItem);
     edit.add(this.redoItem);
+    edit.addSeparator();
+    edit.add(this.selectNonAnnotatedItem);
     edit.addSeparator();
     edit.add(this.showJsonItem);
     edit.add(settings);
@@ -299,7 +303,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     this.registerGlobalUndoRedo();
     this.workspace.setChangeListener(ignored -> this.onEditorStateChanged());
     this.editorTabs.setStateChangeListener(this::updateMenuItems);
-    this.editorTabs.setRevealInTreeListener(path -> this.fileTree.reveal(path));
+    this.editorTabs.setRevealInTreeListener(this.fileTree::reveal);
     this.editorTabs.setSessionClosedListener(this.workspace::close);
     this.fileTree.setFileOpenListener(this::openPath);
     this.fileTree.addSelectionListener(event -> {
@@ -378,6 +382,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     });
   }
 
+  @SuppressWarnings("MagicConstant")
   private KeyStroke menuShortcut(final int keyCode, final int... modifiers) {
     int mask = this.menuShortcutMask;
     for (final int modifier : modifiers) {
@@ -861,6 +866,58 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     this.statusLabel.setText("Nothing to redo");
   }
 
+  private void selectNonAnnotatedImages() {
+    final List<Path> imagePaths = this.fileTree.imagePaths();
+    if (imagePaths.isEmpty()) {
+      this.statusLabel.setText("No images in tree");
+      return;
+    }
+    this.runWithProgress(
+        "Searching non annotated images...",
+        () -> this.findNonAnnotatedImages(imagePaths),
+        found -> this.selectNonAnnotatedImages(found, imagePaths.size()),
+        exception -> this.showError("Non annotated image scan failed: " + exception.getMessage()));
+  }
+
+  private List<Path> findNonAnnotatedImages(final List<Path> imagePaths) throws IOException {
+    final List<Path> result = new ArrayList<>();
+    for (final Path path : imagePaths) {
+      if (!this.hasInternalAnnotations(path)) {
+        result.add(path);
+      }
+    }
+    return List.copyOf(result);
+  }
+
+  private boolean hasInternalAnnotations(final Path path) throws IOException {
+    final Optional<EditorSession> openSession = this.workspace.allSessions().stream()
+        .filter(session -> session.filePath().equals(path))
+        .findFirst();
+    if (openSession.isPresent()) {
+      return !openSession.get().document().entries().isEmpty();
+    }
+    return this.hasSavedInternalAnnotations(path);
+  }
+
+  private boolean hasSavedInternalAnnotations(final Path path) throws IOException {
+    if (!AllowedImageFiles.isPng(path)) {
+      return false;
+    }
+    return !AnnotatedPng.readDocument(path).entries().isEmpty();
+  }
+
+  private void selectNonAnnotatedImages(final List<Path> imagePaths, final int scannedCount) {
+    final String message = String.format(
+        Locale.ROOT,
+        "Found %d non annotated image(s) out of %d scanned image(s).",
+        imagePaths.size(),
+        scannedCount);
+    this.fileTree.selectPaths(imagePaths);
+    this.statusLabel.setText("Selected " + imagePaths.size() + " non annotated image(s)");
+    this.updateMenuItems();
+    this.showInfo(message);
+  }
+
   private void showActiveJson() {
     final ImageCanvas canvas = this.editorTabs.activeCanvas();
     if (canvas == null) {
@@ -881,6 +938,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     this.exportAsItem.setEnabled(this.canExportAs());
     this.undoItem.setEnabled(hasActiveEditor && canvas.session().canUndo());
     this.redoItem.setEnabled(hasActiveEditor && canvas.session().canRedo());
+    this.selectNonAnnotatedItem.setEnabled(this.fileTree.hasOpenFolder());
     this.showJsonItem.setEnabled(hasActiveEditor);
   }
 

@@ -30,10 +30,10 @@ class AnnotatedPngTest {
     return bytes.toByteArray();
   }
 
-  private static BufferedImage createNoisyImage(final int width, final int height) {
-    final BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-    for (int y = 0; y < height; y++) {
-      for (int x = 0; x < width; x++) {
+  private static BufferedImage createNoisyImage() {
+    final BufferedImage image = new BufferedImage(128, 128, BufferedImage.TYPE_INT_RGB);
+    for (int y = 0; y < image.getHeight(); y++) {
+      for (int x = 0; x < image.getWidth(); x++) {
         image.setRGB(x, y, new Color(
             (x * 53 + y * 97) & 0xFF,
             (x * 149 + y * 31) & 0xFF,
@@ -86,6 +86,25 @@ class AnnotatedPngTest {
   }
 
   @Test
+  void readsAnnotationDocumentWithoutFullImageDecode() throws IOException {
+    final BufferedImage base = new BufferedImage(16, 16, BufferedImage.TYPE_INT_RGB);
+    final AnnotationDocument document = new AnnotationDocument();
+    document.add(new AnnotationEntry(
+        "box",
+        AnnotationType.RECTANGLE,
+        "#ff0000",
+        AnnotationCoords.rectangle(0.1, 0.1, 0.4, 0.3)));
+    final ByteArrayOutputStream annotated = new ByteArrayOutputStream();
+    new AnnotatedPng(base, document).write(annotated);
+
+    final AnnotationDocument read =
+        AnnotatedPng.readDocument(new ByteArrayInputStream(annotated.toByteArray()));
+
+    assertEquals(1, read.entries().size());
+    assertEquals("box", read.entries().getFirst().id());
+  }
+
+  @Test
   void readRestoresBaseImageNotComposedDisplayRaster() throws IOException {
     final BufferedImage base = new BufferedImage(64, 48, BufferedImage.TYPE_INT_RGB);
     final Graphics2D graphics = base.createGraphics();
@@ -124,7 +143,7 @@ class AnnotatedPngTest {
 
   @Test
   void optimizerReducesPreviewPngSizeOnlyInsideFilledAnnotations() throws IOException {
-    final BufferedImage base = createNoisyImage(128, 128);
+    final BufferedImage base = createNoisyImage();
     final AnnotationDocument document = new AnnotationDocument();
     document.add(new AnnotationEntry(
         "box",
