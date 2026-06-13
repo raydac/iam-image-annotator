@@ -39,6 +39,7 @@ public final class ColorChooserDialog {
       final Component parent,
       final String title,
       final Color initialColor) {
+    final Component owner = DialogParents.frameOrSelf(parent);
     final JColorChooser chooser = new JColorChooser(initialColor);
     final JPanel panel = new JPanel(new BorderLayout(8, 8));
     panel.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
@@ -46,7 +47,7 @@ public final class ColorChooserDialog {
     panel.add(chooser, BorderLayout.CENTER);
 
     final int choice = JOptionPane.showConfirmDialog(
-        parent,
+        owner,
         panel,
         title,
         JOptionPane.OK_CANCEL_OPTION,

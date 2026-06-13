@@ -22,6 +22,7 @@ public final class MagicWandSettingsDialog {
 
   public static Optional<MagicWandSettings> show(final Component parent,
                                                  final MagicWandSettings initial) {
+    final Component owner = DialogParents.frameOrSelf(parent);
     final MagicWandSettings defaults = initial != null ? initial : MagicWandSettings.defaults();
     final JLabel toleranceLabel = new JLabel(formatTolerance(defaults.tolerance()));
     final JSlider toleranceSlider =
@@ -69,7 +70,7 @@ public final class MagicWandSettingsDialog {
     panel.add(livePreview);
 
     final int choice = JOptionPane.showConfirmDialog(
-        parent,
+        owner,
         panel,
         "Magic wand",
         JOptionPane.OK_CANCEL_OPTION,

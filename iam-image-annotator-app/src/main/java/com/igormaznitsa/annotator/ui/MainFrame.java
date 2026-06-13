@@ -36,6 +36,7 @@ import com.igormaznitsa.annotator.ui.tools.ZoomOutAction;
 import com.igormaznitsa.annotator.ui.tree.FileTreePanel;
 import com.igormaznitsa.annotator.ui.tree.TreeOperationBar;
 import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Toolkit;
 import java.awt.event.InputEvent;
@@ -191,6 +192,11 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
   public boolean confirm(final String title, final String message) {
     return JOptionPane.showConfirmDialog(this, message, title, JOptionPane.YES_NO_OPTION)
         == JOptionPane.YES_OPTION;
+  }
+
+  @Override
+  public Component dialogParent() {
+    return this;
   }
 
   @Override

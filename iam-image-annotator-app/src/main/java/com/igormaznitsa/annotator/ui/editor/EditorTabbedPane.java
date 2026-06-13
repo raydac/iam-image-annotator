@@ -157,7 +157,7 @@ public final class EditorTabbedPane extends JTabbedPane {
     }
     if (canvas.session().isDirty()) {
       final int choice = JOptionPane.showConfirmDialog(
-          this,
+          this.frame,
           "Discard unsaved changes?",
           "Unsaved changes",
           JOptionPane.OK_CANCEL_OPTION);

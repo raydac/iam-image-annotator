@@ -7,6 +7,7 @@ import com.igormaznitsa.annotator.api.render.AnnotationOverlayRenderer;
 import com.igormaznitsa.annotator.api.service.EditorSession;
 import com.igormaznitsa.annotator.ui.api.EditImageTool;
 import com.igormaznitsa.annotator.ui.api.EditorPanelContext;
+import com.igormaznitsa.annotator.ui.dialog.DialogParents;
 import java.awt.AlphaComposite;
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -274,7 +275,8 @@ public final class ImageCanvas extends JPanel implements EditorPanelContext, Scr
   public String askClassId(final String title, final String defaultValue) {
     this.refreshDisplay();
     final String input =
-        JOptionPane.showInputDialog(this, "Class label (alphanumeric, _, ., -):", title,
+        JOptionPane.showInputDialog(DialogParents.frameOrSelf(this),
+            "Class label (alphanumeric, _, ., -):", title,
             JOptionPane.QUESTION_MESSAGE);
     if (input == null || input.isBlank()) {
       return null;
@@ -282,7 +284,8 @@ public final class ImageCanvas extends JPanel implements EditorPanelContext, Scr
     try {
       return ClassNames.normalize(input.trim());
     } catch (final IllegalArgumentException exception) {
-      JOptionPane.showMessageDialog(this, exception.getMessage(), "Invalid class",
+      JOptionPane.showMessageDialog(DialogParents.frameOrSelf(this), exception.getMessage(),
+          "Invalid class",
           JOptionPane.ERROR_MESSAGE);
       return this.askClassId(title, defaultValue);
     }

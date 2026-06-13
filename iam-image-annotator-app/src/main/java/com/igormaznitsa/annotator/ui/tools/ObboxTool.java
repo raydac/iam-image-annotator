@@ -5,11 +5,13 @@ import com.igormaznitsa.annotator.api.model.AnnotationType;
 import com.igormaznitsa.annotator.api.model.NormPoint;
 import com.igormaznitsa.annotator.api.model.ObbCorners;
 import com.igormaznitsa.annotator.ui.api.EditorPanelContext;
+import com.igormaznitsa.annotator.ui.dialog.DialogParents;
 import com.igormaznitsa.annotator.ui.editor.AnnotationCreateFlow;
 import com.igormaznitsa.annotator.ui.editor.EditorDraft;
 import com.igormaznitsa.annotator.ui.editor.Geometry;
 import com.igormaznitsa.annotator.ui.editor.ImageCanvas;
 import com.igormaznitsa.annotator.ui.editor.MouseToolAdapter;
+import java.awt.Component;
 import java.awt.Point;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
@@ -71,7 +73,7 @@ public final class ObboxTool extends AbstractMouseEditTool {
       try {
         this.finish(context, ObbCorners.normalize(this.corners));
       } catch (final IllegalArgumentException exception) {
-        this.showError(exception.getMessage());
+        this.showError(context, exception.getMessage());
         this.reset(context);
       }
       return true;
@@ -89,7 +91,7 @@ public final class ObboxTool extends AbstractMouseEditTool {
           this.corners.get(1),
           this.corners.get(2)));
     } catch (final IllegalArgumentException exception) {
-      this.showError(exception.getMessage());
+      this.showError(context, exception.getMessage());
       this.reset(context);
     }
     return true;
@@ -144,7 +146,7 @@ public final class ObboxTool extends AbstractMouseEditTool {
             this.corners.get(2));
         this.finish(context, quad);
       } catch (final IllegalArgumentException exception) {
-        this.showError(exception.getMessage());
+        this.showError(context, exception.getMessage());
         this.reset(context);
       }
     }
@@ -165,7 +167,7 @@ public final class ObboxTool extends AbstractMouseEditTool {
       try {
         this.finish(context, ObbCorners.normalize(this.corners));
       } catch (final IllegalArgumentException exception) {
-        this.showError(exception.getMessage());
+        this.showError(context, exception.getMessage());
         context.repaintCanvas();
       }
     }
@@ -204,7 +206,12 @@ public final class ObboxTool extends AbstractMouseEditTool {
     }
   }
 
-  private void showError(final String message) {
-    JOptionPane.showMessageDialog(null, message, "OBB", JOptionPane.ERROR_MESSAGE);
+  private void showError(final EditorPanelContext context, final String message) {
+    final Component parent = context instanceof Component component ? component : null;
+    JOptionPane.showMessageDialog(
+        DialogParents.frameOrSelf(parent),
+        message,
+        "OBB",
+        JOptionPane.ERROR_MESSAGE);
   }
 }

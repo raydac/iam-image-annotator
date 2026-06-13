@@ -34,6 +34,7 @@ public final class SettingsDialog {
   }
 
   public static void show(final Component parent) {
+    final Component owner = DialogParents.frameOrSelf(parent);
     final JComboBox<UIManager.LookAndFeelInfo> lookAndFeel =
         new JComboBox<>(installedLookAndFeels());
     lookAndFeel.setRenderer(new LookAndFeelRenderer());
@@ -44,7 +45,7 @@ public final class SettingsDialog {
     panel.add(lookAndFeel, BorderLayout.CENTER);
 
     final int choice = JOptionPane.showConfirmDialog(
-        parent,
+        owner,
         panel,
         "Settings",
         JOptionPane.OK_CANCEL_OPTION,
@@ -53,7 +54,7 @@ public final class SettingsDialog {
       return;
     }
 
-    applySelectedLookAndFeel(parent, (UIManager.LookAndFeelInfo) lookAndFeel.getSelectedItem());
+    applySelectedLookAndFeel(owner, (UIManager.LookAndFeelInfo) lookAndFeel.getSelectedItem());
   }
 
   private static UIManager.LookAndFeelInfo[] installedLookAndFeels() {

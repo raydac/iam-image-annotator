@@ -2,12 +2,11 @@ package com.igormaznitsa.annotator.ui.editor;
 
 import com.igormaznitsa.annotator.api.model.AnnotationEntry;
 import com.igormaznitsa.annotator.ui.api.EditorPanelContext;
+import com.igormaznitsa.annotator.ui.dialog.DialogParents;
 import java.awt.Component;
-import java.awt.Window;
 import java.util.Locale;
 import java.util.Optional;
 import javax.swing.JOptionPane;
-import javax.swing.SwingUtilities;
 
 public final class VertexEditOperations {
 
@@ -255,9 +254,8 @@ public final class VertexEditOperations {
   private static boolean confirmShapeRemove(final EditorPanelContext context,
                                             final AnnotationEntry entry) {
     final Component component = context instanceof Component canvas ? canvas : null;
-    final Window owner = component == null ? null : SwingUtilities.getWindowAncestor(component);
     return JOptionPane.showConfirmDialog(
-        owner,
+        DialogParents.frameOrSelf(component),
         String.format(Locale.ROOT, "Remove annotation \"%s\"?", entry.id()),
         "Remove shape",
         JOptionPane.YES_NO_OPTION,
@@ -267,9 +265,8 @@ public final class VertexEditOperations {
   private static boolean confirmRemove(final EditorPanelContext context,
                                        final AnnotationEntry entry) {
     final Component component = context instanceof Component canvas ? canvas : null;
-    final Window owner = component == null ? null : SwingUtilities.getWindowAncestor(component);
     return JOptionPane.showConfirmDialog(
-        owner,
+        DialogParents.frameOrSelf(component),
         String.format(Locale.ROOT, "Remove the selected point from annotation \"%s\"?", entry.id()),
         "Remove point",
         JOptionPane.YES_NO_OPTION,

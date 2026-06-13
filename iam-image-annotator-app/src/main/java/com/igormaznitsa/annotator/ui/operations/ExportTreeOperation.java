@@ -6,6 +6,7 @@ import com.igormaznitsa.annotator.api.service.AllowedImageFiles;
 import com.igormaznitsa.annotator.api.service.EditorSession;
 import com.igormaznitsa.annotator.ui.api.TreeOperationContext;
 import com.igormaznitsa.annotator.ui.api.TreeOperationIcon;
+import com.igormaznitsa.annotator.ui.dialog.DialogParents;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -41,7 +42,7 @@ public final class ExportTreeOperation implements TreeOperationIcon {
   @Override
   public void execute(final TreeOperationContext context) {
     final int format = JOptionPane.showOptionDialog(
-        null,
+        DialogParents.frameOrSelf(context.dialogParent()),
         "Choose export format",
         "Export annotations",
         JOptionPane.DEFAULT_OPTION,
@@ -63,7 +64,8 @@ public final class ExportTreeOperation implements TreeOperationIcon {
     final JFileChooser chooser = new JFileChooser();
     chooser.setDialogTitle("Export annotations JSON");
     chooser.setFileFilter(new FileNameExtensionFilter("JSON", "json"));
-    if (chooser.showSaveDialog(null) != JFileChooser.APPROVE_OPTION) {
+    if (chooser.showSaveDialog(DialogParents.frameOrSelf(context.dialogParent()))
+        != JFileChooser.APPROVE_OPTION) {
       return;
     }
     Path target = chooser.getSelectedFile().toPath();
@@ -88,7 +90,8 @@ public final class ExportTreeOperation implements TreeOperationIcon {
     final JFileChooser chooser = new JFileChooser();
     chooser.setDialogTitle("Export YOLO OBB label folder");
     chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-    if (chooser.showSaveDialog(null) != JFileChooser.APPROVE_OPTION) {
+    if (chooser.showSaveDialog(DialogParents.frameOrSelf(context.dialogParent()))
+        != JFileChooser.APPROVE_OPTION) {
       return;
     }
     final Path folder = chooser.getSelectedFile().toPath();

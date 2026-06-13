@@ -34,6 +34,7 @@
 - 2026-06-13: Settings dialog now lets users choose any installed Swing Look & Feel, applies it to open windows immediately, and remembers it for next launch.
 - 2026-06-13: Editor toolbar now includes a class-name visibility toggle; enabled labels render under visible zone centers.
 - 2026-06-13: Editor canvas now forwards unhandled mouse-wheel/touchpad events to its enclosing scroll pane so the image scrolls without dragging scrollbars.
+- 2026-06-13: Dialog parent resolution now normalizes canvas/dialog child components back to the application frame so dialogs center consistently.
 
 ## 2. Architecture & Technical Discoveries
 - Java 21 Maven project; use `mvn22` for builds and tests.
@@ -53,12 +54,13 @@
 - `AnnotationEntry.id()` is the exported class label and is not unique; use `AnnotationEntry.key()` for selection, mutation, layer ordering, locking, visibility, and UI hit-test identity.
 - Editor view toggles use `ImageViewToggle`; canvas-only display state such as grid and class labels lives on `ImageCanvas`.
 - `ImageCanvas` forwards unconsumed wheel events to the parent `JScrollPane`; tools that use the wheel must call `consume()`.
+- Use `DialogParents.frameOrSelf(...)` for Swing option panes and file choosers opened from canvas/tool/dialog code; `MainFrame` exposes itself through `TreeOperationContext.dialogParent()`.
 
 ## 3. Technical Debt & Refactoring
 - Some Swing UI methods return `null` internally for optional UI state; consider tightening to `Optional` where it improves call-site clarity.
 
 ## 4. Current Work In Progress
-- Canvas touchpad/mouse-wheel scrolling fixed; `mvn22 -pl iam-image-annotator-app test` passes.
+- Dialog centering standardized on the application frame; `mvn22 -pl iam-image-annotator-app test` passes.
 
 ## 5. Known Issues & Limitations
 - No changelog file is present in the project root.

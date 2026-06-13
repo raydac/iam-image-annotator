@@ -21,6 +21,7 @@ public final class ShapeEditDialog {
   }
 
   public static Optional<Result> show(final Component parent, final AnnotationEntry entry) {
+    final Component owner = DialogParents.frameOrSelf(parent);
     final JTextField idField = new JTextField(entry.id(), 24);
     final Color[] fillColor = {entry.fillColor()};
     final JPanel swatch = new JPanel();
@@ -30,7 +31,7 @@ public final class ShapeEditDialog {
     final JLabel fillLabel = new JLabel(ColorChooserDialog.toHex(fillColor[0]));
     final JButton chooseFill = new JButton("Choose…");
     chooseFill.addActionListener(event -> {
-      final Optional<Color> chosen = ColorChooserDialog.show(parent, "Fill color", fillColor[0]);
+      final Optional<Color> chosen = ColorChooserDialog.show(owner, "Fill color", fillColor[0]);
       if (chosen.isPresent()) {
         fillColor[0] = chosen.get();
         swatch.setBackground(fillColor[0]);
@@ -50,7 +51,7 @@ public final class ShapeEditDialog {
     panel.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
 
     final int choice = JOptionPane.showConfirmDialog(
-        parent,
+        owner,
         panel,
         "Edit shape",
         JOptionPane.OK_CANCEL_OPTION,
@@ -63,9 +64,9 @@ public final class ShapeEditDialog {
       final String fillHex = ClassNames.normalizeColor(ColorChooserDialog.toHex(fillColor[0]));
       return Optional.of(new Result(id, fillHex));
     } catch (final IllegalArgumentException exception) {
-      JOptionPane.showMessageDialog(parent, exception.getMessage(), "Invalid input",
+      JOptionPane.showMessageDialog(owner, exception.getMessage(), "Invalid input",
           JOptionPane.ERROR_MESSAGE);
-      return show(parent, entry);
+      return show(owner, entry);
     }
   }
 

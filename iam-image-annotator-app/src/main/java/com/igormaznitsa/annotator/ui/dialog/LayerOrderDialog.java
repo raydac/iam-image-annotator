@@ -62,7 +62,7 @@ public final class LayerOrderDialog extends JDialog {
   }
 
   public static void showFor(final Frame owner, final EditorPanelContext context) {
-    new LayerOrderDialog(owner, context).setVisible(true);
+    new LayerOrderDialog(DialogParents.frameOf(owner), context).setVisible(true);
   }
 
   private JPanel buildButtons() {
@@ -157,7 +157,10 @@ public final class LayerOrderDialog extends JDialog {
     if (entry == null) {
       return;
     }
-    final String newName = JOptionPane.showInputDialog(this, "New class label:", entry.id());
+    final String newName = JOptionPane.showInputDialog(
+        DialogParents.frameOrSelf(this),
+        "New class label:",
+        entry.id());
     if (newName == null || newName.isBlank()) {
       return;
     }
@@ -168,7 +171,8 @@ public final class LayerOrderDialog extends JDialog {
       this.context.repaintCanvas();
       this.reload();
     } catch (final IllegalArgumentException | IllegalStateException exception) {
-      JOptionPane.showMessageDialog(this, exception.getMessage(), "Rename",
+      JOptionPane.showMessageDialog(DialogParents.frameOrSelf(this), exception.getMessage(),
+          "Rename",
           JOptionPane.ERROR_MESSAGE);
     }
   }
