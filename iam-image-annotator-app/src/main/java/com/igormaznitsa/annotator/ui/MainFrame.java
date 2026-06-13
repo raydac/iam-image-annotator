@@ -36,6 +36,7 @@ import com.igormaznitsa.annotator.ui.tree.FileTreePanel;
 import com.igormaznitsa.annotator.ui.tree.TreeOperationBar;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
+import java.awt.Toolkit;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
@@ -49,6 +50,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -84,6 +86,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
 
   private final IconService icons = new IconService();
   private final EditorWorkspace workspace = new EditorWorkspace();
+  private final int menuShortcutMask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
   private final FileTreePanel fileTree = new FileTreePanel(this.icons);
   private final TreeOperationBar treeOperations = new TreeOperationBar(this.icons, List.of(
       new DeleteTreeOperation(),
@@ -111,6 +114,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
   private final JMenuItem saveAsItem = new JMenuItem("Save as...");
   private final JMenuItem saveAllItem = new JMenuItem("Save All");
   private final JMenuItem exportAsItem = new JMenuItem("Export as...");
+  private final JMenuItem exitItem = new JMenuItem("Exit");
   private final JMenuItem undoItem = new JMenuItem("Undo");
   private final JMenuItem redoItem = new JMenuItem("Redo");
   private final JMenuItem showJsonItem = new JMenuItem("Show JSON");
@@ -210,13 +214,18 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     final JMenu file = new JMenu("File");
     final JMenuItem openFolder = new JMenuItem("Open Folder");
     final JMenuItem openFile = new JMenuItem("Open File");
-    openFolder.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_O, InputEvent.CTRL_DOWN_MASK));
+    openFolder.setAccelerator(this.menuShortcut(KeyEvent.VK_O));
+    this.saveItem.setAccelerator(this.menuShortcut(KeyEvent.VK_S));
+    this.saveAsItem.setAccelerator(this.menuShortcut(KeyEvent.VK_S, InputEvent.SHIFT_DOWN_MASK));
+    this.saveAllItem.setAccelerator(this.menuShortcut(KeyEvent.VK_S, InputEvent.ALT_DOWN_MASK));
+    this.exitItem.setAccelerator(this.exitShortcut());
     openFolder.addActionListener(event -> this.chooseFolder());
     openFile.addActionListener(event -> this.chooseFile());
     this.saveItem.addActionListener(event -> this.saveActive());
     this.saveAsItem.addActionListener(event -> this.saveActiveAs());
     this.saveAllItem.addActionListener(event -> this.saveAll());
     this.exportAsItem.addActionListener(event -> this.exportAs());
+    this.exitItem.addActionListener(event -> this.requestExit());
     file.add(openFolder);
     file.add(openFile);
     file.add(this.exportAsItem);
@@ -224,13 +233,15 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     file.add(this.saveItem);
     file.add(this.saveAsItem);
     file.add(this.saveAllItem);
+    file.addSeparator();
+    file.add(this.exitItem);
     return file;
   }
 
   private JMenu buildEditMenu() {
     final JMenu edit = new JMenu("Edit");
-    this.undoItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_DOWN_MASK));
-    this.redoItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Y, InputEvent.CTRL_DOWN_MASK));
+    this.undoItem.setAccelerator(this.menuShortcut(KeyEvent.VK_Z));
+    this.redoItem.setAccelerator(this.menuShortcut(KeyEvent.VK_Y));
     this.undoItem.addActionListener(event -> this.undoActive());
     this.redoItem.addActionListener(event -> this.redoActive());
     final JMenuItem settings = new JMenuItem("Settings");
@@ -344,10 +355,8 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
   private void registerGlobalUndoRedo() {
     final JRootPane root = this.getRootPane();
     final int when = JRootPane.WHEN_IN_FOCUSED_WINDOW;
-    root.getInputMap(when)
-        .put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_DOWN_MASK), "undo");
-    root.getInputMap(when)
-        .put(KeyStroke.getKeyStroke(KeyEvent.VK_Y, InputEvent.CTRL_DOWN_MASK), "redo");
+    root.getInputMap(when).put(this.menuShortcut(KeyEvent.VK_Z), "undo");
+    root.getInputMap(when).put(this.menuShortcut(KeyEvent.VK_Y), "redo");
     root.getActionMap().put("undo", new AbstractAction() {
       @Override
       public void actionPerformed(final java.awt.event.ActionEvent event) {
@@ -360,6 +369,26 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
         MainFrame.this.redoActive();
       }
     });
+  }
+
+  private KeyStroke menuShortcut(final int keyCode, final int... modifiers) {
+    int mask = this.menuShortcutMask;
+    for (final int modifier : modifiers) {
+      mask |= modifier;
+    }
+    return KeyStroke.getKeyStroke(keyCode, mask);
+  }
+
+  private KeyStroke exitShortcut() {
+    return this.isMacOs()
+        ? this.menuShortcut(KeyEvent.VK_Q)
+        : KeyStroke.getKeyStroke(KeyEvent.VK_F4, InputEvent.ALT_DOWN_MASK);
+  }
+
+  private boolean isMacOs() {
+    return System.getProperty("os.name", "")
+        .toLowerCase(Locale.ROOT)
+        .contains("mac");
   }
 
   private void chooseFolder() {
