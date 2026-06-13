@@ -21,6 +21,7 @@ import com.igormaznitsa.annotator.ui.operations.EditTreeOperation;
 import com.igormaznitsa.annotator.ui.operations.ExportTreeOperation;
 import com.igormaznitsa.annotator.ui.operations.RefreshTreeOperation;
 import com.igormaznitsa.annotator.ui.tools.AddVertexAction;
+import com.igormaznitsa.annotator.ui.tools.ClassNameToggle;
 import com.igormaznitsa.annotator.ui.tools.GridToggle;
 import com.igormaznitsa.annotator.ui.tools.LockSelectedToggle;
 import com.igormaznitsa.annotator.ui.tools.MagicWandTool;
@@ -104,7 +105,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
       new AddVertexAction(),
       new RemoveVertexAction());
   private final List<com.igormaznitsa.annotator.ui.api.ImageViewToggle> viewToggles =
-      List.of(new GridToggle());
+      List.of(new GridToggle(), new ClassNameToggle());
   private final EditorTabbedPane editorTabs;
   private final ProgressGlassPane progressGlassPane = new ProgressGlassPane();
   private final JLabel statusLabel = new JLabel("Ready");

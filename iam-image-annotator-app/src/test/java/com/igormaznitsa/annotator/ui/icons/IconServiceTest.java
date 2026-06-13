@@ -28,6 +28,7 @@ class IconServiceTest {
       "image.png",
       "delete.png",
       "grid.png",
+      "label.png",
       "zoom_out.png",
       "zoom_in.png");
 

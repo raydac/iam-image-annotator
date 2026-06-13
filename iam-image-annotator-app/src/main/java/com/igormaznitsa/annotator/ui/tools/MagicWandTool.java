@@ -113,6 +113,7 @@ public final class MagicWandTool extends AbstractMouseEditTool {
         final double delta = -rotation * TOLERANCE_WHEEL_STEP;
         final double tolerance =
             Math.max(0.0, Math.min(1.0, MagicWandTool.this.settings.tolerance() + delta));
+        event.consume();
         MagicWandTool.this.applySettings(context, new MagicWandSettings(
             tolerance,
             MagicWandTool.this.settings.mode(),

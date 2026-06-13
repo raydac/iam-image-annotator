@@ -7,9 +7,11 @@ import com.igormaznitsa.annotator.api.render.AnnotationOverlayRenderer;
 import com.igormaznitsa.annotator.api.service.EditorSession;
 import com.igormaznitsa.annotator.ui.api.EditImageTool;
 import com.igormaznitsa.annotator.ui.api.EditorPanelContext;
+import java.awt.AlphaComposite;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Point;
@@ -19,7 +21,9 @@ import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseWheelEvent;
 import java.awt.geom.Rectangle2D;
+import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.List;
 import java.util.Locale;
@@ -30,6 +34,7 @@ import javax.swing.AbstractAction;
 import javax.swing.JComponent;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JViewport;
 import javax.swing.KeyStroke;
 import javax.swing.RepaintManager;
@@ -47,6 +52,8 @@ public final class ImageCanvas extends JPanel implements EditorPanelContext, Scr
   private static final java.awt.Color SELECTION_GREEN_DARK = new java.awt.Color(0, 150, 40);
   private static final java.awt.Color LOCKED_HANDLE = new java.awt.Color(160, 160, 160);
   private static final java.awt.Color LOCKED_HANDLE_DARK = new java.awt.Color(90, 90, 90);
+  private static final Color CLASS_LABEL_BACKGROUND = new Color(0, 0, 0, 170);
+  private static final Color CLASS_LABEL_FOREGROUND = Color.WHITE;
   private final EditorSession session;
   private final AnnotationOverlayRenderer overlayRenderer = new AnnotationOverlayRenderer();
   private final Consumer<String> statusConsumer;
@@ -57,6 +64,7 @@ public final class ImageCanvas extends JPanel implements EditorPanelContext, Scr
   private Double rotationArmAngleRad;
   private double zoom = 1.0;
   private boolean gridVisible;
+  private boolean classNamesVisible;
   private boolean addVertexPending;
   private Point lastImagePoint;
   private Runnable selectionListener = () -> {
@@ -176,8 +184,18 @@ public final class ImageCanvas extends JPanel implements EditorPanelContext, Scr
     return this.gridVisible;
   }
 
+  @Override
+  public boolean isClassNamesVisible() {
+    return this.classNamesVisible;
+  }
+
   public void setGridVisible(final boolean gridVisible) {
     this.gridVisible = gridVisible;
+    this.repaint();
+  }
+
+  public void setClassNamesVisible(final boolean classNamesVisible) {
+    this.classNamesVisible = classNamesVisible;
     this.repaint();
   }
 
@@ -300,6 +318,9 @@ public final class ImageCanvas extends JPanel implements EditorPanelContext, Scr
           selected,
           this.zoom);
     }
+    if (this.classNamesVisible) {
+      this.paintClassNames(g2, imageWidth, imageHeight);
+    }
     if (this.draft != null) {
       this.paintDraft(g2, imageWidth, imageHeight);
     }
@@ -328,6 +349,48 @@ public final class ImageCanvas extends JPanel implements EditorPanelContext, Scr
     graphics.setColor(IMAGE_BORDER);
     graphics.setStroke(new BasicStroke((float) Math.max(1.0, 1.0 / this.zoom)));
     graphics.drawRect(0, 0, imageWidth - 1, imageHeight - 1);
+  }
+
+  private void paintClassNames(
+      final Graphics2D graphics,
+      final int imageWidth,
+      final int imageHeight) {
+    graphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
+    graphics.setFont(graphics.getFont().deriveFont((float) Math.max(10.0, 13.0 / this.zoom)));
+
+    for (final AnnotationEntry entry : this.session.document().entries()) {
+      if (entry.visible()) {
+        this.paintClassName(graphics, imageWidth, imageHeight, entry);
+      }
+    }
+  }
+
+  private void paintClassName(
+      final Graphics2D graphics,
+      final int imageWidth,
+      final int imageHeight,
+      final AnnotationEntry entry) {
+    final NormPoint center = Geometry.clampNormPoint(AnnotationSelectionEditor.centroid(entry));
+    final FontMetrics metrics = graphics.getFontMetrics();
+    final String text = entry.id();
+    final int textWidth = metrics.stringWidth(text);
+    final int textHeight = metrics.getAscent() + metrics.getDescent();
+    final double paddingX = Math.max(4.0, 5.0 / this.zoom);
+    final double paddingY = Math.max(2.0, 3.0 / this.zoom);
+    final double gap = Math.max(3.0, 5.0 / this.zoom);
+    final double x = center.x() * imageWidth - textWidth / 2.0 - paddingX;
+    final double y = center.y() * imageHeight + gap;
+    final double width = textWidth + paddingX * 2.0;
+    final double height = textHeight + paddingY * 2.0;
+    final double arc = 8.0 / this.zoom;
+
+    graphics.setColor(CLASS_LABEL_BACKGROUND);
+    graphics.fill(new RoundRectangle2D.Double(x, y, width, height, arc, arc));
+    graphics.setColor(CLASS_LABEL_FOREGROUND);
+    graphics.drawString(
+        text,
+        (float) (x + paddingX),
+        (float) (y + paddingY + metrics.getAscent()));
   }
 
   private void paintSelectionHandles(
@@ -671,7 +734,37 @@ public final class ImageCanvas extends JPanel implements EditorPanelContext, Scr
       if (ImageCanvas.this.activeMouseTool != null) {
         ImageCanvas.this.activeMouseTool.mouseWheelMoved(ImageCanvas.this, event);
       }
+      if (!event.isConsumed()) {
+        ImageCanvas.this.forwardWheelToScrollPane(event);
+      }
     });
+  }
+
+  private void forwardWheelToScrollPane(final MouseWheelEvent event) {
+    if (!(SwingUtilities.getAncestorOfClass(JScrollPane.class,
+        this) instanceof JScrollPane scroll)) {
+      return;
+    }
+    final Point point = SwingUtilities.convertPoint(this, event.getPoint(), scroll);
+    final MouseWheelEvent forwarded = new MouseWheelEvent(
+        scroll,
+        event.getID(),
+        event.getWhen(),
+        event.getModifiersEx(),
+        point.x,
+        point.y,
+        event.getXOnScreen(),
+        event.getYOnScreen(),
+        event.getClickCount(),
+        event.isPopupTrigger(),
+        event.getScrollType(),
+        event.getScrollAmount(),
+        event.getWheelRotation(),
+        event.getPreciseWheelRotation());
+    scroll.dispatchEvent(forwarded);
+    if (forwarded.isConsumed()) {
+      event.consume();
+    }
   }
 
   private void trackCursor(final MouseEvent event) {

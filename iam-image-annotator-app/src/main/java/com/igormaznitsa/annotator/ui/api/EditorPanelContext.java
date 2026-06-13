@@ -16,6 +16,10 @@ public interface EditorPanelContext {
 
   boolean isGridVisible();
 
+  default boolean isClassNamesVisible() {
+    return false;
+  }
+
   Optional<String> selectedAnnotation();
 
   void selectAnnotation(String key);

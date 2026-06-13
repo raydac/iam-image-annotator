@@ -1,6 +1,6 @@
 import com.igormaznitsa.annotator.ui.MainFrame;
+import com.igormaznitsa.annotator.ui.dialog.SettingsDialog;
 import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
 
 public final class IamImageAnnotator {
 
@@ -9,11 +9,7 @@ public final class IamImageAnnotator {
 
   public static void main(final String[] args) {
     SwingUtilities.invokeLater(() -> {
-      try {
-        UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-      } catch (final Exception ignored) {
-        // keep default LAF
-      }
+      SettingsDialog.installStartupLookAndFeel();
       final MainFrame frame = new MainFrame();
       frame.setLocationRelativeTo(null);
       frame.setVisible(true);
