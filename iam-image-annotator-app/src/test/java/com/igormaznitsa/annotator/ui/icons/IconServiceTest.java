@@ -21,7 +21,6 @@ class IconServiceTest {
       "chart_curve_add.png",
       "folder_explorer.png",
       "cross.png",
-      "layer_export.png",
       "folder_edit.png",
       "box_open.png",
       "folder.png",

@@ -182,8 +182,8 @@ public final class YoloDatasetSplitter {
 
   private Map<Integer, Integer> totalClassCounts(final List<YoloImageSample> samples) {
     return samples.stream()
-        .flatMap(sample -> sample.boxes().stream())
-        .collect(Collectors.toMap(YoloBoundingBox::classId, ignored -> 1, Integer::sum));
+        .flatMap(sample -> sample.labels().stream())
+        .collect(Collectors.toMap(YoloObjectLabel::classId, ignored -> 1, Integer::sum));
   }
 
   private List<YoloImageSample> samplesOf(final List<ClusterStats> clusters) {
@@ -209,9 +209,9 @@ public final class YoloDatasetSplitter {
     private static int targetImageCount(final int totalImages, final double ratio) {
       final int rounded = (int) Math.round(totalImages * ratio);
       if (ratio < 0.5d) {
-        return totalImages <= 1 ? 0 : Math.min(totalImages - 1, Math.max(1, rounded));
+        return totalImages <= 1 ? 0 : Math.clamp(rounded, 1, totalImages - 1);
       }
-      return Math.min(totalImages, Math.max(1, rounded));
+      return Math.clamp(rounded, 1, totalImages);
     }
 
     private static <K> void addAll(final Map<K, Integer> target, final Map<K, Integer> source) {

@@ -35,9 +35,9 @@ record YoloBoundingBox(
         this.height);
   }
 
-  record Bounds(double minX, double minY, double maxX, double maxY) {
+  public record Bounds(double minX, double minY, double maxX, double maxY) {
 
-    Bounds {
+    public Bounds {
       minX = clamp01(minX);
       minY = clamp01(minY);
       maxX = clamp01(maxX);

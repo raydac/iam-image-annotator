@@ -2,6 +2,7 @@ package com.igormaznitsa.annotator.exporters.boundingyolo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
@@ -53,10 +54,12 @@ class YoloDatasetSplitterTest {
   private YoloImageSample sample(final String fileName, final long pHash, final int classId) {
     return new YoloImageSample(
         Path.of(fileName),
+        new BufferedImage(4, 4, BufferedImage.TYPE_INT_RGB),
         pHash,
-        List.of(YoloBoundingBox.of(
+        List.of(YoloObjectLabel.of(
             "class-" + classId,
             classId,
+            classId + " 0.400000 0.400000 0.400000 0.400000",
             new YoloBoundingBox.Bounds(0.2, 0.2, 0.6, 0.6))));
   }
 }

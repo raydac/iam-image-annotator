@@ -1,5 +1,6 @@
 package com.igormaznitsa.annotator.exporters.boundingyolo;
 
+import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.EnumMap;
 import java.util.List;
@@ -7,38 +8,39 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-record YoloImageSample(Path imagePath, long pHash, List<YoloBoundingBox> boxes) {
+record YoloImageSample(Path imagePath, BufferedImage baseImage, long pHash,
+                       List<YoloObjectLabel> labels) {
 
   YoloImageSample {
-    boxes = List.copyOf(boxes);
+    labels = List.copyOf(labels);
   }
 
   int objectCount() {
-    return this.boxes.size();
+    return this.labels.size();
   }
 
   Set<Integer> classesPresent() {
-    return this.boxes.stream().map(YoloBoundingBox::classId).collect(Collectors.toSet());
+    return this.labels.stream().map(YoloObjectLabel::classId).collect(Collectors.toSet());
   }
 
   Map<Integer, Integer> classCounts() {
-    return this.boxes.stream()
-        .collect(Collectors.toMap(YoloBoundingBox::classId, ignored -> 1, Integer::sum));
+    return this.labels.stream()
+        .collect(Collectors.toMap(YoloObjectLabel::classId, ignored -> 1, Integer::sum));
   }
 
   Map<ImageZone, Integer> zoneDistribution() {
-    return this.boxes.stream()
+    return this.labels.stream()
         .collect(Collectors.toMap(
-            YoloBoundingBox::zone,
+            YoloObjectLabel::zone,
             ignored -> 1,
             Integer::sum,
             () -> new EnumMap<>(ImageZone.class)));
   }
 
   Map<BoundingBoxSize, Integer> bboxSizeDistribution() {
-    return this.boxes.stream()
+    return this.labels.stream()
         .collect(Collectors.toMap(
-            YoloBoundingBox::size,
+            YoloObjectLabel::size,
             ignored -> 1,
             Integer::sum,
             () -> new EnumMap<>(BoundingBoxSize.class)));

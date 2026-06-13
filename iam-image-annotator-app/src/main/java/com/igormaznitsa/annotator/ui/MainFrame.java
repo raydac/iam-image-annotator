@@ -7,6 +7,9 @@ import com.igormaznitsa.annotator.api.service.EditorSession;
 import com.igormaznitsa.annotator.exporters.api.AnnotatedImagesExporter;
 import com.igormaznitsa.annotator.exporters.api.ExportProgress;
 import com.igormaznitsa.annotator.exporters.boundingyolo.BoundingYoloImageExporter;
+import com.igormaznitsa.annotator.exporters.boundingyolo.ObbYoloImageExporter;
+import com.igormaznitsa.annotator.exporters.boundingyolo.SegmentYoloImageExporter;
+import com.igormaznitsa.annotator.exporters.json.AnnotationJsonImageExporter;
 import com.igormaznitsa.annotator.ui.api.TreeOperationContext;
 import com.igormaznitsa.annotator.ui.component.ProgressGlassPane;
 import com.igormaznitsa.annotator.ui.dialog.SettingsDialog;
@@ -18,7 +21,6 @@ import com.igormaznitsa.annotator.ui.editor.ImageToolBar;
 import com.igormaznitsa.annotator.ui.icons.IconService;
 import com.igormaznitsa.annotator.ui.operations.DeleteTreeOperation;
 import com.igormaznitsa.annotator.ui.operations.EditTreeOperation;
-import com.igormaznitsa.annotator.ui.operations.ExportTreeOperation;
 import com.igormaznitsa.annotator.ui.operations.RefreshTreeOperation;
 import com.igormaznitsa.annotator.ui.tools.AddVertexAction;
 import com.igormaznitsa.annotator.ui.tools.ClassNameToggle;
@@ -93,10 +95,13 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
   private final TreeOperationBar treeOperations = new TreeOperationBar(this.icons, List.of(
       new DeleteTreeOperation(),
       new EditTreeOperation(),
-      new RefreshTreeOperation(),
-      new ExportTreeOperation()));
+      new RefreshTreeOperation()));
   private final List<AnnotatedImagesExporter> annotatedImageExporters =
-      List.of(new BoundingYoloImageExporter(0));
+      List.of(
+          new BoundingYoloImageExporter(0),
+          new ObbYoloImageExporter(0),
+          new SegmentYoloImageExporter(0),
+          new AnnotationJsonImageExporter(this::openSessionForExport));
   private final List<com.igormaznitsa.annotator.ui.api.ImageViewAction> viewActions = List.of(
       new ZoomInAction(),
       new ZoomOutAction());
@@ -507,12 +512,19 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
   private Optional<AnnotatedImagesExporter> configuredExporter(
       final AnnotatedImagesExporter exporter) {
     if (exporter instanceof BoundingYoloImageExporter) {
-      return this.promptBoundingYoloExporter();
+      return this.promptYoloDatasetExporter(YoloDatasetExportType.BOUNDING);
+    }
+    if (exporter instanceof ObbYoloImageExporter) {
+      return this.promptYoloDatasetExporter(YoloDatasetExportType.OBB);
+    }
+    if (exporter instanceof SegmentYoloImageExporter) {
+      return this.promptYoloDatasetExporter(YoloDatasetExportType.SEGMENT);
     }
     return Optional.of(exporter);
   }
 
-  private Optional<AnnotatedImagesExporter> promptBoundingYoloExporter() {
+  private Optional<AnnotatedImagesExporter> promptYoloDatasetExporter(
+      final YoloDatasetExportType type) {
     while (true) {
       final String value = JOptionPane.showInputDialog(
           this,
@@ -522,13 +534,38 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
         return Optional.empty();
       }
       try {
-        return Optional.of(new BoundingYoloImageExporter(
-            Integer.parseInt(value.strip()),
-            this::confirmDetectedClasses));
+        return Optional.of(this.createYoloDatasetExporter(
+            type,
+            Integer.parseInt(value.strip())));
       } catch (final IllegalArgumentException exception) {
         this.showError("Class id must be a non-negative integer.");
       }
     }
+  }
+
+  private AnnotatedImagesExporter createYoloDatasetExporter(
+      final YoloDatasetExportType type,
+      final int firstClassId) {
+    return switch (type) {
+      case BOUNDING -> new BoundingYoloImageExporter(
+          firstClassId,
+          this::confirmDetectedClasses,
+          this::openSessionForExport);
+      case OBB -> new ObbYoloImageExporter(
+          firstClassId,
+          this::confirmDetectedClasses,
+          this::openSessionForExport);
+      case SEGMENT -> new SegmentYoloImageExporter(
+          firstClassId,
+          this::confirmDetectedClasses,
+          this::openSessionForExport);
+    };
+  }
+
+  private Optional<EditorSession> openSessionForExport(final Path path) {
+    return this.workspace.allSessions().stream()
+        .filter(open -> open.filePath().equals(path))
+        .findFirst();
   }
 
   private boolean confirmDetectedClasses(final Map<String, Integer> classIds) {
@@ -571,6 +608,12 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
           builder.append(entry.getValue()).append(": ").append(entry.getKey());
         });
     return builder.toString();
+  }
+
+  private enum YoloDatasetExportType {
+    BOUNDING,
+    OBB,
+    SEGMENT
   }
 
   private void exportImagesWithProgress(

@@ -36,6 +36,7 @@
 - 2026-06-13: Editor canvas now forwards unhandled mouse-wheel/touchpad events to its enclosing scroll pane so the image scrolls without dragging scrollbars.
 - 2026-06-13: Dialog parent resolution now normalizes canvas/dialog child components back to the application frame so dialogs center consistently.
 - 2026-06-13: Edit > Select all non annotated scans all image nodes under the opened tree folder with progress, selects files without internal annotation entries, and reports the found count in an info dialog.
+- 2026-06-13: Removed the tree toolbar annotation export button; File > Export as... now provides filters for YOLO bounding, OBB, and segmentation datasets plus JSON annotation files.
 
 ## 2. Architecture & Technical Discoveries
 - Java 21 Maven project; use `mvn22` for builds and tests.
@@ -49,7 +50,8 @@
 - `MainFrame` runs long open/save tasks through a `SwingWorker` plus reusable `ProgressGlassPane`; existing-open tabs are selected immediately.
 - `FileTreePanel.refresh()` rebuilds from disk while restoring expanded folder paths and still-existing selections.
 - Annotated-image exporter API lives in `exporters.api`; shared exporter helpers live in `exporters.common`; each concrete exporter keeps its implementation classes in its own `exporters.<name>` subpackage.
-- YOLO bounding exporter skips plain/unannotated PNGs, writes Ultralytics layout `images/train`, `images/val`, `labels/train`, `labels/val`, exports visible annotations as bounding boxes, writes base images from `iBSE` as JPEG quality 95, writes `data.yaml`, and uses `YoloDatasetSplitter` to keep similar images in the same train/val split.
+- YOLO dataset exporters skip plain/unannotated images, write Ultralytics layout `images/train`, `images/val`, `labels/train`, `labels/val`, export base images as JPEG quality 95, write `data.yaml`, and use `YoloDatasetSplitter` to keep similar images in the same train/val split.
+- YOLO bounding export writes boxes for visible rectangles, polygons, OBBs, and pose boxes; OBB export writes visible OBB corners; segmentation export writes visible rectangles, polygons, and OBBs as polygon coordinate rows.
 - YOLO validation split is target-capped at 20% of exported annotated images; oversized visually similar clusters stay together and may make validation smaller rather than overfilling it.
 - YOLO class IDs are built from normalized export class names; source annotation labels are not rewritten.
 - `AnnotationEntry.id()` is the exported class label and is not unique; use `AnnotationEntry.key()` for selection, mutation, layer ordering, locking, visibility, and UI hit-test identity.
@@ -58,12 +60,13 @@
 - Use `DialogParents.frameOrSelf(...)` for Swing option panes and file choosers opened from canvas/tool/dialog code; `MainFrame` exposes itself through `TreeOperationContext.dialogParent()`.
 - `FileTreePanel` supports programmatic multi-selection through `selectPaths(...)`; the tree is already configured for discontiguous selection.
 - `AnnotatedPng.readDocument(...)` reads only the annotation JSON chunk and avoids base/display image decode for metadata-only scans.
+- JSON export writes one file per selected annotated image; all YOLO/JSON exporters include open unsaved editor sessions and skip images with no relevant annotations instead of writing empty files.
 
 ## 3. Technical Debt & Refactoring
 - Some Swing UI methods return `null` internally for optional UI state; consider tightening to `Optional` where it improves call-site clarity.
 
 ## 4. Current Work In Progress
-- Non-annotated image selector added to Edit menu; `mvn22 -pl iam-image-annotator-app test` passes.
+- YOLO dataset exporters now cover bounding, OBB, and segmentation; app module tests pass.
 
 ## 5. Known Issues & Limitations
 - No changelog file is present in the project root.
