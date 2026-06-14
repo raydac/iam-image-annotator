@@ -37,6 +37,7 @@
 - 2026-06-13: Dialog parent resolution now normalizes canvas/dialog child components back to the application frame so dialogs center consistently.
 - 2026-06-13: Edit > Select all non annotated scans all image nodes under the opened tree folder with progress, selects files without internal annotation entries, and reports the found count in an info dialog.
 - 2026-06-13: Removed the tree toolbar annotation export button; File > Export as... now provides filters for YOLO bounding, OBB, and segmentation datasets plus JSON annotation files.
+- 2026-06-14: Edit > Select images by class prompts for a class name, scans image annotations case-insensitively, selects matching tree files, and reports the found count.
 
 ## 2. Architecture & Technical Discoveries
 - Java 21 Maven project; use `mvn22` for builds and tests.
@@ -61,12 +62,13 @@
 - `FileTreePanel` supports programmatic multi-selection through `selectPaths(...)`; the tree is already configured for discontiguous selection.
 - `AnnotatedPng.readDocument(...)` reads only the annotation JSON chunk and avoids base/display image decode for metadata-only scans.
 - JSON export writes one file per selected annotated image; all YOLO/JSON exporters include open unsaved editor sessions and skip images with no relevant annotations instead of writing empty files.
+- MainFrame tree selection scans prefer open editor session annotations before reading saved PNG metadata, so unsaved changes participate in selection/export-style operations.
 
 ## 3. Technical Debt & Refactoring
 - Some Swing UI methods return `null` internally for optional UI state; consider tightening to `Optional` where it improves call-site clarity.
 
 ## 4. Current Work In Progress
-- YOLO dataset exporters now cover bounding, OBB, and segmentation; app module tests pass.
+- YOLO dataset exporters cover bounding, OBB, and segmentation; app module tests pass.
 
 ## 5. Known Issues & Limitations
 - No changelog file is present in the project root.

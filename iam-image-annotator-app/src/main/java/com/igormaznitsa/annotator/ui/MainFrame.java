@@ -1,6 +1,8 @@
 package com.igormaznitsa.annotator.ui;
 
 import com.igormaznitsa.annotator.api.json.AnnotationJsonCodec;
+import com.igormaznitsa.annotator.api.model.AnnotationDocument;
+import com.igormaznitsa.annotator.api.model.ClassNames;
 import com.igormaznitsa.annotator.api.png.AnnotatedPng;
 import com.igormaznitsa.annotator.api.service.AllowedImageFiles;
 import com.igormaznitsa.annotator.api.service.EditorSession;
@@ -125,6 +127,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
   private final JMenuItem undoItem = new JMenuItem("Undo");
   private final JMenuItem redoItem = new JMenuItem("Redo");
   private final JMenuItem selectNonAnnotatedItem = new JMenuItem("Select all non annotated");
+  private final JMenuItem selectByClassItem = new JMenuItem("Select images by class...");
   private final JMenuItem showJsonItem = new JMenuItem("Show JSON");
 
   public MainFrame() {
@@ -258,6 +261,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     this.undoItem.addActionListener(event -> this.undoActive());
     this.redoItem.addActionListener(event -> this.redoActive());
     this.selectNonAnnotatedItem.addActionListener(event -> this.selectNonAnnotatedImages());
+    this.selectByClassItem.addActionListener(event -> this.selectImagesByClass());
     final JMenuItem settings = new JMenuItem("Settings");
     settings.addActionListener(event -> SettingsDialog.show(this));
     this.showJsonItem.addActionListener(event -> this.showActiveJson());
@@ -265,6 +269,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     edit.add(this.redoItem);
     edit.addSeparator();
     edit.add(this.selectNonAnnotatedItem);
+    edit.add(this.selectByClassItem);
     edit.addSeparator();
     edit.add(this.showJsonItem);
     edit.add(settings);
@@ -933,20 +938,9 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
   }
 
   private boolean hasInternalAnnotations(final Path path) throws IOException {
-    final Optional<EditorSession> openSession = this.workspace.allSessions().stream()
-        .filter(session -> session.filePath().equals(path))
-        .findFirst();
-    if (openSession.isPresent()) {
-      return !openSession.get().document().entries().isEmpty();
-    }
-    return this.hasSavedInternalAnnotations(path);
-  }
-
-  private boolean hasSavedInternalAnnotations(final Path path) throws IOException {
-    if (!AllowedImageFiles.isPng(path)) {
-      return false;
-    }
-    return !AnnotatedPng.readDocument(path).entries().isEmpty();
+    return this.readAnnotationDocument(path)
+        .map(document -> !document.entries().isEmpty())
+        .orElse(false);
   }
 
   private void selectNonAnnotatedImages(final List<Path> imagePaths, final int scannedCount) {
@@ -957,6 +951,90 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
         scannedCount);
     this.fileTree.selectPaths(imagePaths);
     this.statusLabel.setText("Selected " + imagePaths.size() + " non annotated image(s)");
+    this.updateMenuItems();
+    this.showInfo(message);
+  }
+
+  private void selectImagesByClass() {
+    this.promptClassName().ifPresent(this::selectImagesByClass);
+  }
+
+  private Optional<String> promptClassName() {
+    while (true) {
+      final String value = JOptionPane.showInputDialog(this, "Class name:", APP_TITLE,
+          JOptionPane.QUESTION_MESSAGE);
+      if (value == null) {
+        return Optional.empty();
+      }
+      try {
+        return Optional.of(ClassNames.normalize(value));
+      } catch (final IllegalArgumentException exception) {
+        this.showError(exception.getMessage());
+      }
+    }
+  }
+
+  private void selectImagesByClass(final String className) {
+    final List<Path> imagePaths = this.fileTree.imagePaths();
+    if (imagePaths.isEmpty()) {
+      this.statusLabel.setText("No images in tree");
+      this.showInfo("No images in tree.");
+      return;
+    }
+    this.runWithProgress(
+        "Searching images by class...",
+        () -> this.findImagesWithClass(imagePaths, className),
+        found -> this.selectImagesByClass(found, imagePaths.size(), className),
+        exception -> this.showError("Image class scan failed: " + exception.getMessage()));
+  }
+
+  private List<Path> findImagesWithClass(final List<Path> imagePaths, final String className)
+      throws IOException {
+    final List<Path> result = new ArrayList<>();
+    for (final Path path : imagePaths) {
+      if (this.hasInternalClass(path, className)) {
+        result.add(path);
+      }
+    }
+    return List.copyOf(result);
+  }
+
+  private boolean hasInternalClass(final Path path, final String className) throws IOException {
+    return this.readAnnotationDocument(path)
+        .map(document -> this.hasClass(document, className))
+        .orElse(false);
+  }
+
+  private Optional<AnnotationDocument> readAnnotationDocument(final Path path) throws IOException {
+    final Optional<EditorSession> openSession = this.workspace.allSessions().stream()
+        .filter(session -> session.filePath().equals(path))
+        .findFirst();
+    if (openSession.isPresent()) {
+      return Optional.of(openSession.get().document());
+    }
+    if (!AllowedImageFiles.isPng(path)) {
+      return Optional.empty();
+    }
+    return Optional.of(AnnotatedPng.readDocument(path));
+  }
+
+  private boolean hasClass(final AnnotationDocument document, final String className) {
+    return document.entries().stream()
+        .anyMatch(entry -> ClassNames.matchesIgnoreCase(entry.id(), className));
+  }
+
+  private void selectImagesByClass(
+      final List<Path> imagePaths,
+      final int scannedCount,
+      final String className) {
+    final String message = String.format(
+        Locale.ROOT,
+        "Found %d image(s) with class \"%s\" out of %d scanned image(s).",
+        imagePaths.size(),
+        className,
+        scannedCount);
+    this.fileTree.selectPaths(imagePaths);
+    this.statusLabel.setText("Selected " + imagePaths.size() + " image(s) with class " + className);
     this.updateMenuItems();
     this.showInfo(message);
   }
@@ -982,6 +1060,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     this.undoItem.setEnabled(hasActiveEditor && canvas.session().canUndo());
     this.redoItem.setEnabled(hasActiveEditor && canvas.session().canRedo());
     this.selectNonAnnotatedItem.setEnabled(this.fileTree.hasOpenFolder());
+    this.selectByClassItem.setEnabled(this.fileTree.hasOpenFolder());
     this.showJsonItem.setEnabled(hasActiveEditor);
   }
 
