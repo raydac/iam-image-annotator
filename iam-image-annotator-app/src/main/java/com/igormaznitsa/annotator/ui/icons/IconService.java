@@ -15,6 +15,7 @@ public final class IconService {
   private static final String ICON_ROOT = "/icons/";
 
   private final Map<String, ImageIcon> cache = new ConcurrentHashMap<>();
+  private final Map<String, ImageIcon> rawCache = new ConcurrentHashMap<>();
 
   private static ImageIcon loadIcon(final String fileName) {
     final URL url = IconService.class.getResource(ICON_ROOT + fileName);
@@ -48,11 +49,20 @@ public final class IconService {
     return this.cache.computeIfAbsent(fileName, IconService::loadIcon);
   }
 
-  public ImageIcon scaled(final String fileName, final int size) {
-    return scaleToSquare(this.icon16(fileName), size);
+  private static ImageIcon loadRawIcon(final String fileName) {
+    final URL url = IconService.class.getResource(ICON_ROOT + fileName);
+    return url == null ? emptyIcon(ICON_PX) : new ImageIcon(url);
+  }
+
+  public ImageIcon icon(final String fileName) {
+    return this.rawCache.computeIfAbsent(fileName, IconService::loadRawIcon);
   }
 
   public boolean exists(final String fileName) {
     return IconService.class.getResource(ICON_ROOT + fileName) != null;
+  }
+
+  public ImageIcon scaled(final String fileName, final int size) {
+    return scaleToSquare(this.icon(fileName), size);
   }
 }

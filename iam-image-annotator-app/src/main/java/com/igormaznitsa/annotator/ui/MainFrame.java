@@ -132,6 +132,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
 
   public MainFrame() {
     super(APP_TITLE);
+    this.setIconImage(this.icons.icon("appicon.png").getImage());
     this.editorTabs = new EditorTabbedPane(
         this.icons,
         (canvas, frame) -> new ImageToolBar(
@@ -283,7 +284,8 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
         this,
         APP_TITLE + "\nVersion " + VERSION + "\nAuthor: Igor Maznitsa",
         "About",
-        JOptionPane.INFORMATION_MESSAGE));
+        JOptionPane.INFORMATION_MESSAGE,
+        this.icons.icon("appicon32x32.png")));
     help.add(about);
     return help;
   }
