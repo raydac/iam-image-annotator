@@ -89,6 +89,8 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
 
   private static final String APP_TITLE = "IAM Image Annotator";
   private static final String VERSION = "1.0-SNAPSHOT";
+  private static final int UNSAVED_FILES_VISIBLE_ROWS = 10;
+  private static final int UNSAVED_FILES_VISIBLE_COLUMNS = 44;
 
   private final IconService icons = new IconService();
   private final EditorWorkspace workspace = new EditorWorkspace();
@@ -313,7 +315,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
 
   private void wireEvents() {
     this.registerExitConfirmation();
-    this.registerGlobalUndoRedo();
+    this.registerGlobalEditorShortcuts();
     this.workspace.setChangeListener(ignored -> this.onEditorStateChanged());
     this.editorTabs.setStateChangeListener(this::updateMenuItems);
     this.editorTabs.setRevealInTreeListener(this.fileTree::reveal);
@@ -335,15 +337,15 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
   }
 
   private void requestExit() {
-    if (!this.workspace.hasDirtySessions()) {
+    final List<EditorSession> dirtySessions = this.workspace.dirtySessions();
+    if (dirtySessions.isEmpty()) {
       this.exitApplication();
       return;
     }
-    final String files = this.formatDirtySessionList();
     final Object[] options = {"Save All", "Don't Save", "Cancel"};
     final int choice = JOptionPane.showOptionDialog(
         this,
-        "You have unsaved changes in:\n\n" + files + "\n\nSave before closing?",
+        this.createUnsavedChangesPanel(dirtySessions),
         "Unsaved changes",
         JOptionPane.DEFAULT_OPTION,
         JOptionPane.WARNING_MESSAGE,
@@ -365,9 +367,29 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     System.exit(0);
   }
 
-  private String formatDirtySessionList() {
+  private JPanel createUnsavedChangesPanel(final List<EditorSession> dirtySessions) {
+    final JTextArea files = new JTextArea(
+        this.formatDirtySessionList(dirtySessions),
+        Math.min(UNSAVED_FILES_VISIBLE_ROWS, dirtySessions.size()),
+        UNSAVED_FILES_VISIBLE_COLUMNS);
+    files.setEditable(false);
+    files.setCaretPosition(0);
+
+    final JScrollPane scrollPane = new JScrollPane(files);
+    scrollPane.setPreferredSize(new Dimension(
+        scrollPane.getPreferredSize().width,
+        Math.min(220, scrollPane.getPreferredSize().height)));
+
+    final JPanel panel = new JPanel(new BorderLayout(0, 8));
+    panel.add(new JLabel("You have unsaved changes in:"), BorderLayout.NORTH);
+    panel.add(scrollPane, BorderLayout.CENTER);
+    panel.add(new JLabel("Save before closing?"), BorderLayout.SOUTH);
+    return panel;
+  }
+
+  private String formatDirtySessionList(final List<EditorSession> dirtySessions) {
     final StringBuilder builder = new StringBuilder();
-    for (final EditorSession session : this.workspace.dirtySessions()) {
+    for (final EditorSession session : dirtySessions) {
       if (!builder.isEmpty()) {
         builder.append('\n');
       }
@@ -376,11 +398,12 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     return builder.toString();
   }
 
-  private void registerGlobalUndoRedo() {
+  private void registerGlobalEditorShortcuts() {
     final JRootPane root = this.getRootPane();
     final int when = JRootPane.WHEN_IN_FOCUSED_WINDOW;
     root.getInputMap(when).put(this.menuShortcut(KeyEvent.VK_Z), "undo");
     root.getInputMap(when).put(this.menuShortcut(KeyEvent.VK_Y), "redo");
+    root.getInputMap(when).put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "cancelDrawing");
     root.getActionMap().put("undo", new AbstractAction() {
       @Override
       public void actionPerformed(final java.awt.event.ActionEvent event) {
@@ -393,6 +416,19 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
         MainFrame.this.redoActive();
       }
     });
+    root.getActionMap().put("cancelDrawing", new AbstractAction() {
+      @Override
+      public void actionPerformed(final java.awt.event.ActionEvent event) {
+        MainFrame.this.cancelActiveEditorDrawing();
+      }
+    });
+  }
+
+  private void cancelActiveEditorDrawing() {
+    final ImageCanvas canvas = this.editorTabs.activeCanvas();
+    if (canvas != null) {
+      canvas.cancelActiveDrawing();
+    }
   }
 
   @SuppressWarnings("MagicConstant")

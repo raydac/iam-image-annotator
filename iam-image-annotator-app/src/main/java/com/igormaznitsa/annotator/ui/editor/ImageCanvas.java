@@ -600,22 +600,25 @@ public final class ImageCanvas extends JPanel implements EditorPanelContext, Scr
   }
 
   private void registerKeyboardActions() {
-    final int when = JPanel.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT;
-    final KeyStroke escape = KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0);
-    this.getInputMap(when).put(escape, "cancelDrawing");
-    this.getActionMap().put("cancelDrawing", new AbstractAction() {
+    final AbstractAction cancelDrawing = new AbstractAction() {
       @Override
       public void actionPerformed(final ActionEvent event) {
         ImageCanvas.this.cancelActiveDrawing();
       }
-    });
+    };
+    final KeyStroke escape = KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0);
+    this.getInputMap(JComponent.WHEN_FOCUSED).put(escape, "cancelDrawing");
+    this.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(escape, "cancelDrawing");
+    this.getActionMap().put("cancelDrawing", cancelDrawing);
     final AbstractAction completeDrawing = new AbstractAction() {
       @Override
       public void actionPerformed(final ActionEvent event) {
         ImageCanvas.this.handleEditorKey(KeyEvent.VK_ENTER);
       }
     };
-    this.getInputMap(when).put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "completeDrawing");
+    final int whenAncestor = JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT;
+    this.getInputMap(whenAncestor)
+        .put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "completeDrawing");
     this.getActionMap().put("completeDrawing", completeDrawing);
     final int whenFocused = JComponent.WHEN_FOCUSED;
     final AbstractAction removeSelection = new AbstractAction() {

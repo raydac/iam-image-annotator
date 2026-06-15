@@ -60,6 +60,7 @@ public final class MagicWandTool extends AbstractMouseEditTool {
     }
     this.applySettings(context, chosen.get());
     super.activate(context);
+    this.requestCanvasFocus(context);
   }
 
   @Override
@@ -68,6 +69,20 @@ public final class MagicWandTool extends AbstractMouseEditTool {
     this.sampleGrid = null;
     this.lastPreviewPoint = null;
     super.deactivate(context);
+  }
+
+  @Override
+  public boolean cancelDrawing(final EditorPanelContext context) {
+    if (!(context instanceof ImageCanvas canvas)) {
+      return super.cancelDrawing(context);
+    }
+    this.armed = false;
+    this.sampleGrid = null;
+    this.clearDrawingState(context);
+    canvas.activateSelectTool();
+    context.updateStatus("Magic wand cancelled");
+    context.repaintCanvas();
+    return true;
   }
 
   @Override
@@ -149,6 +164,7 @@ public final class MagicWandTool extends AbstractMouseEditTool {
         Locale.ROOT,
         "%s — Shift+click settings, scroll wheel tolerance",
         previewHint)));
+    this.requestCanvasFocus(context);
   }
 
   private void previewAt(final EditorPanelContext context, final Point imagePoint) {
@@ -208,6 +224,12 @@ public final class MagicWandTool extends AbstractMouseEditTool {
     return new Point(
         Math.max(0, Math.min(width - 1, imagePoint.x)),
         Math.max(0, Math.min(height - 1, imagePoint.y)));
+  }
+
+  private void requestCanvasFocus(final EditorPanelContext context) {
+    if (context instanceof ImageCanvas canvas) {
+      canvas.requestFocusInWindow();
+    }
   }
 
   private String statusLine(final String hint) {

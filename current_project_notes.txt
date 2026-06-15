@@ -41,6 +41,8 @@
 - 2026-06-14: Main application JFrame now uses `icons/appicon.png` as the window icon.
 - 2026-06-14: About dialog now uses cached `icons/appicon32x32.png` as its dialog icon.
 - 2026-06-15: File chooser dialogs now remember their last accepted folder per dialog type for the current app run; directory choosers reopen with that folder preselected from its parent.
+- 2026-06-15: Esc now cancels Magic Wand use by clearing its preview state and returning the editor to the Select tool; Esc is also handled at the main window level so it works without canvas focus.
+- 2026-06-15: Exit-time unsaved changes prompt now shows changed files in a bounded scrollable list.
 
 ## 2. Architecture & Technical Discoveries
 - Java 21 Maven project; use `mvn22` for builds and tests.
