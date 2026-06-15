@@ -92,6 +92,7 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
 
   private final IconService icons = new IconService();
   private final EditorWorkspace workspace = new EditorWorkspace();
+  private final LastFileChooserFolder fileChooserFolders = new LastFileChooserFolder();
   private final int menuShortcutMask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
   private final FileTreePanel fileTree = new FileTreePanel(this.icons);
   private final TreeOperationBar treeOperations = new TreeOperationBar(this.icons, List.of(
@@ -416,12 +417,15 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
   }
 
   private void chooseFolder() {
-    final JFileChooser chooser = new JFileChooser();
+    final JFileChooser chooser =
+        this.fileChooserFolders.createDirectoryChooser(LastFileChooserFolder.Dialog.OPEN_FOLDER);
     chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
     chooser.setDialogTitle("Open folder");
     if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
       try {
-        this.fileTree.openFolder(this.selectedFolder(chooser));
+        final Path folder = this.selectedFolder(chooser);
+        this.fileChooserFolders.rememberFolder(LastFileChooserFolder.Dialog.OPEN_FOLDER, folder);
+        this.fileTree.openFolder(folder);
         this.treeOperations.refreshState(this);
         this.updateMenuItems();
       } catch (final IOException exception) {
@@ -431,7 +435,9 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
   }
 
   private Path selectedFolder(final JFileChooser chooser) {
-    final Path selected = chooser.getSelectedFile().toPath();
+    final Path selected = Optional.ofNullable(chooser.getSelectedFile())
+        .map(file -> file.toPath())
+        .orElseGet(() -> chooser.getCurrentDirectory().toPath());
     final Path current = chooser.getCurrentDirectory().toPath();
     if (Files.isDirectory(current)
         && !Files.isDirectory(selected)
@@ -443,9 +449,13 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
   }
 
   private void chooseFile() {
-    final JFileChooser chooser = new JFileChooser();
+    final JFileChooser chooser =
+        this.fileChooserFolders.createChooser(LastFileChooserFolder.Dialog.OPEN_IMAGE);
     chooser.setFileFilter(new FileNameExtensionFilter("Images", "png", "jpg", "jpeg"));
     if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+      this.fileChooserFolders.rememberSelectedFileFolder(
+          LastFileChooserFolder.Dialog.OPEN_IMAGE,
+          chooser);
       this.openPath(chooser.getSelectedFile().toPath());
     }
   }
@@ -457,7 +467,8 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
       return;
     }
 
-    final JFileChooser chooser = new JFileChooser();
+    final JFileChooser chooser =
+        this.fileChooserFolders.createDirectoryChooser(LastFileChooserFolder.Dialog.EXPORT_IMAGES);
     chooser.setDialogTitle("Export annotated images as...");
     chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
     chooser.setAcceptAllFileFilterUsed(false);
@@ -469,10 +480,12 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     }
 
     final AnnotatedImagesExporter selected = this.selectedExporter(chooser.getFileFilter());
+    final Path folder = this.selectedFolder(chooser);
+    this.fileChooserFolders.rememberFolder(LastFileChooserFolder.Dialog.EXPORT_IMAGES, folder);
     this.configuredExporter(selected).ifPresent(exporter -> this.exportImagesWithProgress(
         exporter,
         imageFiles,
-        this.selectedFolder(chooser)));
+        folder));
   }
 
   private boolean canExportAs() {
@@ -807,13 +820,16 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
     if (canvas == null) {
       return;
     }
-    final JFileChooser chooser = new JFileChooser();
-    chooser.setSelectedFile(
-        AllowedImageFiles.toAnnotatedPngPath(canvas.session().filePath()).toFile());
+    final JFileChooser chooser =
+        this.fileChooserFolders.createChooser(LastFileChooserFolder.Dialog.SAVE_IMAGE_AS);
+    chooser.setSelectedFile(this.suggestedSaveAsPath(canvas.session()).toFile());
     chooser.setFileFilter(new FileNameExtensionFilter("PNG images", "png"));
     if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
       return;
     }
+    this.fileChooserFolders.rememberSelectedFileFolder(
+        LastFileChooserFolder.Dialog.SAVE_IMAGE_AS,
+        chooser);
     final EditorSession session = canvas.session();
     final Path source = session.filePath();
     final Path target = AllowedImageFiles.toAnnotatedPngPath(chooser.getSelectedFile().toPath());
@@ -826,6 +842,13 @@ public final class MainFrame extends JFrame implements TreeOperationContext {
         },
         saved -> this.afterSave(saved, "Saved " + saved.target().getFileName()),
         exception -> this.showError("Save failed: " + exception.getMessage()));
+  }
+
+  private Path suggestedSaveAsPath(final EditorSession session) {
+    final Path defaultTarget = AllowedImageFiles.toAnnotatedPngPath(session.filePath());
+    return this.fileChooserFolders.rememberedFolder(LastFileChooserFolder.Dialog.SAVE_IMAGE_AS)
+        .map(folder -> folder.resolve(defaultTarget.getFileName()))
+        .orElse(defaultTarget);
   }
 
   private void saveAll() {

@@ -40,6 +40,7 @@
 - 2026-06-14: Edit > Select images by class prompts for a class name, scans image annotations case-insensitively, selects matching tree files, and reports the found count.
 - 2026-06-14: Main application JFrame now uses `icons/appicon.png` as the window icon.
 - 2026-06-14: About dialog now uses cached `icons/appicon32x32.png` as its dialog icon.
+- 2026-06-15: File chooser dialogs now remember their last accepted folder per dialog type for the current app run; directory choosers reopen with that folder preselected from its parent.
 
 ## 2. Architecture & Technical Discoveries
 - Java 21 Maven project; use `mvn22` for builds and tests.
@@ -61,6 +62,7 @@
 - Editor view toggles use `ImageViewToggle`; canvas-only display state such as grid and class labels lives on `ImageCanvas`.
 - `ImageCanvas` forwards unconsumed wheel events to the parent `JScrollPane`; tools that use the wheel must call `consume()`.
 - Use `DialogParents.frameOrSelf(...)` for Swing option panes and file choosers opened from canvas/tool/dialog code; `MainFrame` exposes itself through `TreeOperationContext.dialogParent()`.
+- File chooser last-folder memory is centralized in `LastFileChooserFolder` static runtime state; stale/deleted directories are ignored, and directory choosers preselect remembered folders rather than opening inside them.
 - `FileTreePanel` supports programmatic multi-selection through `selectPaths(...)`; the tree is already configured for discontiguous selection.
 - `AnnotatedPng.readDocument(...)` reads only the annotation JSON chunk and avoids base/display image decode for metadata-only scans.
 - JSON export writes one file per selected annotated image; all YOLO/JSON exporters include open unsaved editor sessions and skip images with no relevant annotations instead of writing empty files.
