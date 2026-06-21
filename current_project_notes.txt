@@ -84,6 +84,7 @@
 
 ## 7. Useful References
 - Run tests: `mvn22 test`
+- Start app with 4 GB heap through Maven: `mvn22 -pl iam-image-annotator-app compile exec:exec`
 
 ## 8. User Advice and Recommendations
 - Keep project notes concise and update them during substantial development work.
